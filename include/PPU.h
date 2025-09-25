@@ -1,9 +1,11 @@
 #ifndef PPU
 #define PPU
 
+#include <assert.h>
 #include <cpu.h>
 #include <memory.h>
 #include <stdbool.h>
+#include <stdio.h>
 
 // https://hacktix.github.io/GBEDG/ppu/
 
@@ -66,7 +68,7 @@ inline void lcd_set(uint8_t x, uint8_t y, uint8_t value)
     lcd[byte_idx] |= (uint8_t)((value & 0x3) << bit_offset);
 };
 
-inline bool lcdc_get_flag(Memory *memory, uint8_t flag)
+static inline bool lcdc_get_flag(Memory *memory, uint8_t flag)
 {
     uint8_t mask = 0x01 << flag;
     if (flag > 7)
@@ -77,7 +79,7 @@ inline bool lcdc_get_flag(Memory *memory, uint8_t flag)
     return (memory->data[LCDC] & mask) != 0;
 }
 
-inline void lcdc_set_flag(Memory *memory, uint8_t flag, bool value)
+static inline void lcdc_set_flag(Memory *memory, uint8_t flag, bool value)
 {
     uint8_t mask = 0x01 << flag;
     if (flag > 7)

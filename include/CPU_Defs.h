@@ -1,6 +1,7 @@
 #ifndef CPU_DEFS
 #define CPU_DEFS
 #include <Memory.h>
+#include <stdbool.h>
 #include <stdint.h>
 
 #if defined(__BYTE_ORDER__) && __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__

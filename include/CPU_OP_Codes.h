@@ -1,6 +1,7 @@
 #ifndef CPU_OP_CODES
 #define CPU_OP_CODES
 #include "CPU_Defs.h"
+#include "CPU_Instructions.h"
 #include <stdint.h>
 #include <stdio.h>
 
