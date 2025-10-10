@@ -265,5 +265,6 @@ void cpu_op_0xFF(CPUState *cpu);
 
 // Déclaration externe du tableau d'opcodes
 extern const void (*opcodes[])(CPUState *);
+extern const void (*extended_opcodes[])(CPUState *);
 
 #endif

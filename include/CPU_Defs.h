@@ -1,8 +1,10 @@
 #ifndef CPU_DEFS
 #define CPU_DEFS
-#include <Memory.h>
+#include "Memory.h"
 #include <stdbool.h>
 #include <stdint.h>
+
+// Forward declaration to avoid circular dependency
 
 #if defined(__BYTE_ORDER__) && __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__
 #define CPU_BIG_ENDIAN
@@ -83,12 +85,48 @@ typedef struct
         };
     };
 
-    uint16_t SP;          // Stack Pointer
-    uint16_t PC;          // Program Counter
-    Memory *memory;       // Pointer to the memory structure
-    uint64_t cycle_count; // Cycle count for performance tracking
+    uint16_t SP;                 // Stack Pointer
+    uint16_t PC;                 // Program Counter
+    bool IME : 1;                // Interrupt Master Enable
+    bool EI_pending : 1;         // EI executed, enable IME after one instruction delay
+    bool IME_enable_pending : 1; // IME will be enabled on the next instruction fetch
+    bool halt : 1;               // CPU is halted
+    bool stop : 1;               // CPU is stopped
+    MemoryState *memory;         // Pointer to the memory state structure
+    uint64_t cycle_count;        // Cycle count for performance tracking
 } CPUState;
 
-#define A_REGISTER (cpu)((cpu)->AF >> 8)
+static inline void setZ(CPUState *c, bool v)
+{
+    if (v)
+        c->F |= FLAG_Z;
+    else
+        c->F &= ~FLAG_Z;
+    c->F &= 0xF0;
+}
+static inline void setN(CPUState *c, bool v)
+{
+    if (v)
+        c->F |= FLAG_N;
+    else
+        c->F &= ~FLAG_N;
+    c->F &= 0xF0;
+}
+static inline void setH(CPUState *c, bool v)
+{
+    if (v)
+        c->F |= FLAG_H;
+    else
+        c->F &= ~FLAG_H;
+    c->F &= 0xF0;
+}
+static inline void setC(CPUState *c, bool v)
+{
+    if (v)
+        c->F |= FLAG_C;
+    else
+        c->F &= ~FLAG_C;
+    c->F &= 0xF0;
+}
 
 #endif

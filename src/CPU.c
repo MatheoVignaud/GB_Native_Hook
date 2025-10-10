@@ -2,7 +2,6 @@
 
 void cpu_reset(CPUState *cpu)
 {
-    // Reset all registers
     cpu->A = 0;
     cpu->F = 0;
     cpu->B = 0;
@@ -12,31 +11,56 @@ void cpu_reset(CPUState *cpu)
     cpu->H = 0;
     cpu->L = 0;
 
-    // Reset Stack Pointer and Program Counter
     cpu->SP = 0xFFFE;
-    cpu->PC = 0x100;
+    if (cpu->memory->bios_enabled)
+    {
+        cpu->PC = 0x0000;
+    }
+    else
+    {
+        cpu->PC = 0x100;
+    }
 
-    cpu->cycle_count = 0;
+    cpu->IME = false;
+    cpu->EI_pending = false;
+    cpu->halt = false;
+    cpu->stop = false;
+
+    cpu->cycle_count = 2;
 }
 
 uint64_t instruction_count = 0;
 
-void cpu_execute_instruction(CPUState *cpu)
-{
-    /*printf("Cycle Count: %llu\n", cpu->cycle_count);
-    printf("PC: 0x%04X, SP: 0x%04X, AF: 0x%04X, BC: 0x%04X, DE: 0x%04X, HL: 0x%04X\n",
-           cpu->PC, cpu->SP, cpu->AF, cpu->BC, cpu->DE, cpu->HL);*/
-    uint16_t prev_pc = cpu->PC;
-    uint8_t opcode = cpu->memory->data[cpu->PC++];
+uint16_t breakpoints[] = {};
 
-    opcodes[opcode](cpu);
-    if (cpu->PC >= 0x230)
+uint32_t cpu_execute_instruction(CPUState *cpu)
+{
+
+    for (size_t i = 0; i < sizeof(breakpoints) / sizeof(breakpoints[0]); ++i)
     {
-        // press enter to continue
-        printf("Press Enter to continue...");
-        getchar();
-        printf("Executing opcode: 0x%02X at PC: 0x%04X , Registers: AF: 0x%04X, BC: 0x%04X, DE: 0x%04X, HL: 0x%04X, SP: 0x%04X \n", opcode, prev_pc, cpu->AF, cpu->BC, cpu->DE, cpu->HL, cpu->SP);
+        if (cpu->PC == breakpoints[i])
+        {
+            printf("Breakpoint hit at PC=%04X\n", cpu->PC);
+            printf("PC=%04X SP=%04X AF=%04X BC=%04X DE=%04X HL=%04X IME=%d IE=%02X IF=%02X LY=%02X OP=%02X\n",
+                   cpu->PC, cpu->SP, cpu->AF, cpu->BC, cpu->DE, cpu->HL, cpu->IME,
+                   cpu->memory->memory.IE, cpu->memory->memory.IF, cpu->memory->memory.LY,
+                   memory_read(cpu->memory, cpu->PC));
+            getchar();
+            break;
+        }
     }
 
+    if (instruction_count % 10000 == 0)
+        printf("PC=%04X SP=%04X AF=%04X BC=%04X DE=%04X HL=%04X IME=%d IE=%02X IF=%02X LY=%02X OP=%02X\n",
+               cpu->PC, cpu->SP, cpu->AF, cpu->BC, cpu->DE, cpu->HL, cpu->IME,
+               cpu->memory->memory.IE, cpu->memory->memory.IF, cpu->memory->memory.LY,
+               memory_read(cpu->memory, cpu->PC));
+
+    uint64_t prev_cycles = cpu->cycle_count;
+
+    uint8_t opcode = memory_read(cpu->memory, cpu->PC++);
+    opcodes[opcode](cpu);
     instruction_count++;
+
+    return (uint32_t)(cpu->cycle_count - prev_cycles);
 }

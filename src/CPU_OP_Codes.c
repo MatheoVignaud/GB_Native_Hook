@@ -2,27 +2,23 @@
 
 void cpu_op_0x00(CPUState *cpu)
 {
-    cpu->cycle_count += 1;
+    nop(cpu);
 }
 void cpu_op_0x01(CPUState *cpu)
 {
-    printf("Opcode 0x01 not implemented yet.\n"); // TODO: implementation de l'opcode 0x01
-    abort();
+    ld_r16_n16(&cpu->BC, cpu);
 }
 void cpu_op_0x02(CPUState *cpu)
 {
-    printf("Opcode 0x02 not implemented yet.\n"); // TODO: implementation de l'opcode 0x02
-    abort();
+    ld_r16_a(cpu->BC, cpu);
 }
 void cpu_op_0x03(CPUState *cpu)
 {
-    printf("Opcode 0x03 not implemented yet.\n"); // TODO: implementation de l'opcode 0x03
-    abort();
+    inc_r16(&cpu->BC, cpu);
 }
 void cpu_op_0x04(CPUState *cpu)
 {
-    printf("Opcode 0x04 not implemented yet.\n"); // TODO: implementation de l'opcode 0x04
-    abort();
+    inc_r8(&cpu->B, cpu);
 }
 void cpu_op_0x05(CPUState *cpu)
 {
@@ -30,37 +26,31 @@ void cpu_op_0x05(CPUState *cpu)
 }
 void cpu_op_0x06(CPUState *cpu)
 {
-    ld_r8_n8(&cpu->B, cpu->memory->data[cpu->PC++], cpu);
+    ld_r8_n8(&cpu->B, memory_read(cpu->memory, cpu->PC++), cpu);
 }
 void cpu_op_0x07(CPUState *cpu)
 {
-    printf("Opcode 0x07 not implemented yet.\n"); // TODO: implementation de l'opcode 0x07
-    abort();
+    rlca(cpu);
 }
 void cpu_op_0x08(CPUState *cpu)
 {
-    printf("Opcode 0x08 not implemented yet.\n"); // TODO: implementation de l'opcode 0x08
-    abort();
+    ld_n16_sp(cpu);
 }
 void cpu_op_0x09(CPUState *cpu)
 {
-    printf("Opcode 0x09 not implemented yet.\n"); // TODO: implementation de l'opcode 0x09
-    abort();
+    add_hl_r16(cpu->BC, cpu);
 }
 void cpu_op_0x0A(CPUState *cpu)
 {
-    printf("Opcode 0x0A not implemented yet.\n"); // TODO: implementation de l'opcode 0x0A
-    abort();
+    ld_a_r16(cpu->BC, cpu);
 }
 void cpu_op_0x0B(CPUState *cpu)
 {
-    printf("Opcode 0x0B not implemented yet.\n"); // TODO: implementation de l'opcode 0x0B
-    abort();
+    dec_r16(&cpu->BC, cpu);
 }
 void cpu_op_0x0C(CPUState *cpu)
 {
-    printf("Opcode 0x0C not implemented yet.\n"); // TODO: implementation de l'opcode 0x0C
-    abort();
+    inc_r8(&cpu->C, cpu);
 }
 void cpu_op_0x0D(CPUState *cpu)
 {
@@ -68,181 +58,148 @@ void cpu_op_0x0D(CPUState *cpu)
 }
 void cpu_op_0x0E(CPUState *cpu)
 {
-    ld_r8_n8(&cpu->C, cpu->memory->data[cpu->PC++], cpu);
+    ld_r8_n8(&cpu->C, memory_read(cpu->memory, cpu->PC++), cpu);
 }
 void cpu_op_0x0F(CPUState *cpu)
 {
-    printf("Opcode 0x0F not implemented yet.\n"); // TODO: implementation de l'opcode 0x0F
-    abort();
+    rrca(cpu);
 }
 void cpu_op_0x10(CPUState *cpu)
 {
-    printf("Opcode 0x10 not implemented yet.\n"); // TODO: implementation de l'opcode 0x10
-    abort();
+    stop(cpu);
 }
 void cpu_op_0x11(CPUState *cpu)
 {
-    printf("Opcode 0x11 not implemented yet.\n"); // TODO: implementation de l'opcode 0x11
-    abort();
+    ld_r16_n16(&cpu->DE, cpu);
 }
 void cpu_op_0x12(CPUState *cpu)
 {
-    printf("Opcode 0x12 not implemented yet.\n"); // TODO: implementation de l'opcode 0x12
-    abort();
+    ld_r16_a(cpu->DE, cpu);
 }
 void cpu_op_0x13(CPUState *cpu)
 {
-    printf("Opcode 0x13 not implemented yet.\n"); // TODO: implementation de l'opcode 0x13
-    abort();
+    inc_r16(&cpu->DE, cpu);
 }
 void cpu_op_0x14(CPUState *cpu)
 {
-    printf("Opcode 0x14 not implemented yet.\n"); // TODO: implementation de l'opcode 0x14
-    abort();
+    inc_r8(&cpu->D, cpu);
 }
 void cpu_op_0x15(CPUState *cpu)
 {
-    printf("Opcode 0x15 not implemented yet.\n"); // TODO: implementation de l'opcode 0x15
-    abort();
+    dec_r8(&cpu->D, cpu);
 }
 void cpu_op_0x16(CPUState *cpu)
 {
-    printf("Opcode 0x16 not implemented yet.\n"); // TODO: implementation de l'opcode 0x16
-    abort();
+    ld_r8_n8(&cpu->D, memory_read(cpu->memory, cpu->PC++), cpu);
 }
 void cpu_op_0x17(CPUState *cpu)
 {
-    printf("Opcode 0x17 not implemented yet.\n"); // TODO: implementation de l'opcode 0x17
-    abort();
+    rla(cpu);
 }
 void cpu_op_0x18(CPUState *cpu)
 {
-    printf("Opcode 0x18 not implemented yet.\n"); // TODO: implementation de l'opcode 0x18
-    abort();
+    jr_e8((int8_t)memory_read(cpu->memory, cpu->PC++), cpu);
 }
 void cpu_op_0x19(CPUState *cpu)
 {
-    printf("Opcode 0x19 not implemented yet.\n"); // TODO: implementation de l'opcode 0x19
-    abort();
+    add_hl_r16(cpu->DE, cpu);
 }
 void cpu_op_0x1A(CPUState *cpu)
 {
-    printf("Opcode 0x1A not implemented yet.\n"); // TODO: implementation de l'opcode 0x1A
-    abort();
+    ld_a_r16(cpu->DE, cpu);
 }
 void cpu_op_0x1B(CPUState *cpu)
 {
-    printf("Opcode 0x1B not implemented yet.\n"); // TODO: implementation de l'opcode 0x1B
-    abort();
+    dec_r16(&cpu->DE, cpu);
 }
 void cpu_op_0x1C(CPUState *cpu)
 {
-    printf("Opcode 0x1C not implemented yet.\n"); // TODO: implementation de l'opcode 0x1C
-    abort();
+    inc_r8(&cpu->E, cpu);
 }
 void cpu_op_0x1D(CPUState *cpu)
 {
-    printf("Opcode 0x1D not implemented yet.\n"); // TODO: implementation de l'opcode 0x1D
-    abort();
+    dec_r8(&cpu->E, cpu);
 }
 void cpu_op_0x1E(CPUState *cpu)
 {
-    printf("Opcode 0x1E not implemented yet.\n"); // TODO: implementation de l'opcode 0x1E
-    abort();
+    ld_r8_n8(&cpu->E, memory_read(cpu->memory, cpu->PC++), cpu);
 }
 void cpu_op_0x1F(CPUState *cpu)
 {
-    printf("Opcode 0x1F not implemented yet.\n"); // TODO: implementation de l'opcode 0x1F
-    abort();
+    rra(cpu);
 }
 void cpu_op_0x20(CPUState *cpu)
 {
-    jr_cc_e8((cpu->F & (1 << 7)) == 0, (int8_t)cpu->memory->data[cpu->PC++], cpu);
+    jr_cc_e8((cpu->F & (1 << 7)) == 0, (int8_t)memory_read(cpu->memory, cpu->PC++), cpu);
 }
 void cpu_op_0x21(CPUState *cpu)
 {
-    ld_r16_n16(&cpu->HL, cpu->memory->data[cpu->PC] | (cpu->memory->data[cpu->PC + 1] << 8), cpu);
-    cpu->PC += 2;
+    ld_r16_n16(&cpu->HL, cpu);
 }
 void cpu_op_0x22(CPUState *cpu)
 {
-    printf("Opcode 0x22 not implemented yet.\n"); // TODO: implementation de l'opcode 0x22
-    abort();
+    ld_hl_inc_a(cpu);
 }
 void cpu_op_0x23(CPUState *cpu)
 {
-    printf("Opcode 0x23 not implemented yet.\n"); // TODO: implementation de l'opcode 0x23
-    abort();
+    inc_r16(&cpu->HL, cpu);
 }
 void cpu_op_0x24(CPUState *cpu)
 {
-    printf("Opcode 0x24 not implemented yet.\n"); // TODO: implementation de l'opcode 0x24
-    abort();
+    inc_r8(&cpu->H, cpu);
 }
 void cpu_op_0x25(CPUState *cpu)
 {
-    printf("Opcode 0x25 not implemented yet.\n"); // TODO: implementation de l'opcode 0x25
-    abort();
+    dec_r8(&cpu->H, cpu);
 }
 void cpu_op_0x26(CPUState *cpu)
 {
-    printf("Opcode 0x26 not implemented yet.\n"); // TODO: implementation de l'opcode 0x26
-    abort();
+    ld_r8_n8(&cpu->H, memory_read(cpu->memory, cpu->PC++), cpu);
 }
 void cpu_op_0x27(CPUState *cpu)
 {
-    printf("Opcode 0x27 not implemented yet.\n"); // TODO: implementation de l'opcode 0x27
-    abort();
+    daa(cpu);
 }
 void cpu_op_0x28(CPUState *cpu)
 {
-    printf("Opcode 0x28 not implemented yet.\n"); // TODO: implementation de l'opcode 0x28
-    abort();
+    jr_cc_e8((cpu->F & (1 << 7)) != 0, (int8_t)memory_read(cpu->memory, cpu->PC++), cpu);
 }
 void cpu_op_0x29(CPUState *cpu)
 {
-    printf("Opcode 0x29 not implemented yet.\n"); // TODO: implementation de l'opcode 0x29
-    abort();
+    add_hl_r16(cpu->HL, cpu);
 }
 void cpu_op_0x2A(CPUState *cpu)
 {
-    printf("Opcode 0x2A not implemented yet.\n"); // TODO: implementation de l'opcode 0x2A
-    abort();
+    ld_a_hl_inc(cpu);
 }
 void cpu_op_0x2B(CPUState *cpu)
 {
-    printf("Opcode 0x2B not implemented yet.\n"); // TODO: implementation de l'opcode 0x2B
-    abort();
+    dec_r16(&cpu->HL, cpu);
 }
 void cpu_op_0x2C(CPUState *cpu)
 {
-    printf("Opcode 0x2C not implemented yet.\n"); // TODO: implementation de l'opcode 0x2C
-    abort();
+    inc_r8(&cpu->L, cpu);
 }
 void cpu_op_0x2D(CPUState *cpu)
 {
-    printf("Opcode 0x2D not implemented yet.\n"); // TODO: implementation de l'opcode 0x2D
-    abort();
+    dec_r8(&cpu->L, cpu);
 }
 void cpu_op_0x2E(CPUState *cpu)
 {
-    printf("Opcode 0x2E not implemented yet.\n"); // TODO: implementation de l'opcode 0x2E
-    abort();
+    ld_r8_n8(&cpu->L, memory_read(cpu->memory, cpu->PC++), cpu);
 }
 void cpu_op_0x2F(CPUState *cpu)
 {
-    printf("Opcode 0x2F not implemented yet.\n"); // TODO: implementation de l'opcode 0x2F
-    abort();
+    cpl(cpu);
 }
 void cpu_op_0x30(CPUState *cpu)
 {
-    printf("Opcode 0x30 not implemented yet.\n"); // TODO: implementation de l'opcode 0x30
-    abort();
+    jr_cc_e8((cpu->F & (1 << 4)) == 0, (int8_t)memory_read(cpu->memory, cpu->PC++), cpu);
 }
 void cpu_op_0x31(CPUState *cpu)
 {
-    printf("Opcode 0x31 not implemented yet.\n"); // TODO: implementation de l'opcode 0x31
-    abort();
+    ld_sp_n16(memory_read(cpu->memory, cpu->PC) | (memory_read(cpu->memory, cpu->PC + 1) << 8), cpu);
+    cpu->PC += 2;
 }
 void cpu_op_0x32(CPUState *cpu)
 {
@@ -250,622 +207,499 @@ void cpu_op_0x32(CPUState *cpu)
 }
 void cpu_op_0x33(CPUState *cpu)
 {
-    printf("Opcode 0x33 not implemented yet.\n"); // TODO: implementation de l'opcode 0x33
-    abort();
+    inc_r16(&cpu->SP, cpu);
 }
 void cpu_op_0x34(CPUState *cpu)
 {
-    printf("Opcode 0x34 not implemented yet.\n"); // TODO: implementation de l'opcode 0x34
-    abort();
+    inc_hl(cpu);
 }
 void cpu_op_0x35(CPUState *cpu)
 {
-    printf("Opcode 0x35 not implemented yet.\n"); // TODO: implementation de l'opcode 0x35
-    abort();
+    dec_hl(cpu);
 }
 void cpu_op_0x36(CPUState *cpu)
 {
-    printf("Opcode 0x36 not implemented yet.\n"); // TODO: implementation de l'opcode 0x36
-    abort();
+    ld_hl_n8(memory_read(cpu->memory, cpu->PC++), cpu);
 }
 void cpu_op_0x37(CPUState *cpu)
 {
-    printf("Opcode 0x37 not implemented yet.\n"); // TODO: implementation de l'opcode 0x37
-    abort();
+    scf(cpu);
 }
 void cpu_op_0x38(CPUState *cpu)
 {
-    printf("Opcode 0x38 not implemented yet.\n"); // TODO: implementation de l'opcode 0x38
-    abort();
+    jr_cc_e8((cpu->F & FLAG_C) != 0, (int8_t)memory_read(cpu->memory, cpu->PC++), cpu);
 }
 void cpu_op_0x39(CPUState *cpu)
 {
-    printf("Opcode 0x39 not implemented yet.\n"); // TODO: implementation de l'opcode 0x39
-    abort();
+    add_hl_sp(cpu);
 }
 void cpu_op_0x3A(CPUState *cpu)
 {
-    printf("Opcode 0x3A not implemented yet.\n"); // TODO: implementation de l'opcode 0x3A
-    abort();
+    ld_a_hl_dec(cpu);
 }
 void cpu_op_0x3B(CPUState *cpu)
 {
-    printf("Opcode 0x3B not implemented yet.\n"); // TODO: implementation de l'opcode 0x3B
-    abort();
+    dec_r16(&cpu->SP, cpu);
 }
 void cpu_op_0x3C(CPUState *cpu)
 {
-    printf("Opcode 0x3C not implemented yet.\n"); // TODO: implementation de l'opcode 0x3C
-    abort();
+    inc_r8(&cpu->A, cpu);
 }
 void cpu_op_0x3D(CPUState *cpu)
 {
-    printf("Opcode 0x3D not implemented yet.\n"); // TODO: implementation de l'opcode 0x3D
-    abort();
+    dec_r8(&cpu->A, cpu);
 }
 void cpu_op_0x3E(CPUState *cpu)
 {
-    ld_r8_n8(&cpu->A, cpu->memory->data[cpu->PC++], cpu);
+    ld_r8_n8(&cpu->A, memory_read(cpu->memory, cpu->PC++), cpu);
 }
 void cpu_op_0x3F(CPUState *cpu)
 {
-    printf("Opcode 0x3F not implemented yet.\n"); // TODO: implementation de l'opcode 0x3F
-    abort();
+    ccf(cpu);
 }
 void cpu_op_0x40(CPUState *cpu)
 {
-    printf("Opcode 0x40 not implemented yet.\n"); // TODO: implementation de l'opcode 0x40
-    abort();
+    ld_r8_r8(&cpu->B, &cpu->B, cpu);
 }
 void cpu_op_0x41(CPUState *cpu)
 {
-    printf("Opcode 0x41 not implemented yet.\n"); // TODO: implementation de l'opcode 0x41
-    abort();
+    ld_r8_r8(&cpu->B, &cpu->C, cpu);
 }
 void cpu_op_0x42(CPUState *cpu)
 {
-    printf("Opcode 0x42 not implemented yet.\n"); // TODO: implementation de l'opcode 0x42
-    abort();
+    ld_r8_r8(&cpu->B, &cpu->D, cpu);
 }
 void cpu_op_0x43(CPUState *cpu)
 {
-    printf("Opcode 0x43 not implemented yet.\n"); // TODO: implementation de l'opcode 0x43
-    abort();
+    ld_r8_r8(&cpu->B, &cpu->E, cpu);
 }
 void cpu_op_0x44(CPUState *cpu)
 {
-    printf("Opcode 0x44 not implemented yet.\n"); // TODO: implementation de l'opcode 0x44
-    abort();
+    ld_r8_r8(&cpu->B, &cpu->H, cpu);
 }
 void cpu_op_0x45(CPUState *cpu)
 {
-    printf("Opcode 0x45 not implemented yet.\n"); // TODO: implementation de l'opcode 0x45
-    abort();
+    ld_r8_r8(&cpu->B, &cpu->L, cpu);
 }
 void cpu_op_0x46(CPUState *cpu)
 {
-    printf("Opcode 0x46 not implemented yet.\n"); // TODO: implementation de l'opcode 0x46
-    abort();
+    ld_r8_hl(&cpu->B, cpu);
 }
 void cpu_op_0x47(CPUState *cpu)
 {
-    printf("Opcode 0x47 not implemented yet.\n"); // TODO: implementation de l'opcode 0x47
-    abort();
+    ld_r8_r8(&cpu->B, &cpu->A, cpu);
 }
 void cpu_op_0x48(CPUState *cpu)
 {
-    printf("Opcode 0x48 not implemented yet.\n"); // TODO: implementation de l'opcode 0x48
-    abort();
+    ld_r8_r8(&cpu->C, &cpu->B, cpu);
 }
 void cpu_op_0x49(CPUState *cpu)
 {
-    printf("Opcode 0x49 not implemented yet.\n"); // TODO: implementation de l'opcode 0x49
-    abort();
+    ld_r8_r8(&cpu->C, &cpu->C, cpu);
 }
 void cpu_op_0x4A(CPUState *cpu)
 {
-    printf("Opcode 0x4A not implemented yet.\n"); // TODO: implementation de l'opcode 0x4A
-    abort();
+    ld_r8_r8(&cpu->C, &cpu->D, cpu);
 }
 void cpu_op_0x4B(CPUState *cpu)
 {
-    printf("Opcode 0x4B not implemented yet.\n"); // TODO: implementation de l'opcode 0x4B
-    abort();
+    ld_r8_r8(&cpu->C, &cpu->E, cpu);
 }
 void cpu_op_0x4C(CPUState *cpu)
 {
-    printf("Opcode 0x4C not implemented yet.\n"); // TODO: implementation de l'opcode 0x4C
-    abort();
+    ld_r8_r8(&cpu->C, &cpu->H, cpu);
 }
 void cpu_op_0x4D(CPUState *cpu)
 {
-    printf("Opcode 0x4D not implemented yet.\n"); // TODO: implementation de l'opcode 0x4D
-    abort();
+    ld_r8_r8(&cpu->C, &cpu->L, cpu);
 }
 void cpu_op_0x4E(CPUState *cpu)
 {
-    printf("Opcode 0x4E not implemented yet.\n"); // TODO: implementation de l'opcode 0x4E
-    abort();
+    ld_r8_hl(&cpu->C, cpu);
 }
 void cpu_op_0x4F(CPUState *cpu)
 {
-    printf("Opcode 0x4F not implemented yet.\n"); // TODO: implementation de l'opcode 0x4F
-    abort();
+    ld_r8_r8(&cpu->C, &cpu->A, cpu);
 }
 void cpu_op_0x50(CPUState *cpu)
 {
-    printf("Opcode 0x50 not implemented yet.\n"); // TODO: implementation de l'opcode 0x50
-    abort();
+    ld_r8_r8(&cpu->D, &cpu->B, cpu);
 }
 void cpu_op_0x51(CPUState *cpu)
 {
-    printf("Opcode 0x51 not implemented yet.\n"); // TODO: implementation de l'opcode 0x51
-    abort();
+    ld_r8_r8(&cpu->D, &cpu->C, cpu);
 }
 void cpu_op_0x52(CPUState *cpu)
 {
-    printf("Opcode 0x52 not implemented yet.\n"); // TODO: implementation de l'opcode 0x52
-    abort();
+    ld_r8_r8(&cpu->D, &cpu->D, cpu);
 }
 void cpu_op_0x53(CPUState *cpu)
 {
-    printf("Opcode 0x53 not implemented yet.\n"); // TODO: implementation de l'opcode 0x53
-    abort();
+    ld_r8_r8(&cpu->D, &cpu->E, cpu);
 }
 void cpu_op_0x54(CPUState *cpu)
 {
-    printf("Opcode 0x54 not implemented yet.\n"); // TODO: implementation de l'opcode 0x54
-    abort();
+    ld_r8_r8(&cpu->D, &cpu->H, cpu);
 }
 void cpu_op_0x55(CPUState *cpu)
 {
-    printf("Opcode 0x55 not implemented yet.\n"); // TODO: implementation de l'opcode 0x55
-    abort();
+    ld_r8_r8(&cpu->D, &cpu->L, cpu);
 }
 void cpu_op_0x56(CPUState *cpu)
 {
-    printf("Opcode 0x56 not implemented yet.\n"); // TODO: implementation de l'opcode 0x56
-    abort();
+    ld_r8_hl(&cpu->D, cpu);
 }
 void cpu_op_0x57(CPUState *cpu)
 {
-    printf("Opcode 0x57 not implemented yet.\n"); // TODO: implementation de l'opcode 0x57
-    abort();
+    ld_r8_r8(&cpu->D, &cpu->A, cpu);
 }
 void cpu_op_0x58(CPUState *cpu)
 {
-    printf("Opcode 0x58 not implemented yet.\n"); // TODO: implementation de l'opcode 0x58
-    abort();
+    ld_r8_r8(&cpu->E, &cpu->B, cpu);
 }
 void cpu_op_0x59(CPUState *cpu)
 {
-    printf("Opcode 0x59 not implemented yet.\n"); // TODO: implementation de l'opcode 0x59
-    abort();
+    ld_r8_r8(&cpu->E, &cpu->C, cpu);
 }
 void cpu_op_0x5A(CPUState *cpu)
 {
-    printf("Opcode 0x5A not implemented yet.\n"); // TODO: implementation de l'opcode 0x5A
-    abort();
+    ld_r8_r8(&cpu->E, &cpu->D, cpu);
 }
 void cpu_op_0x5B(CPUState *cpu)
 {
-    printf("Opcode 0x5B not implemented yet.\n"); // TODO: implementation de l'opcode 0x5B
-    abort();
+    ld_r8_r8(&cpu->E, &cpu->E, cpu);
 }
 void cpu_op_0x5C(CPUState *cpu)
 {
-    printf("Opcode 0x5C not implemented yet.\n"); // TODO: implementation de l'opcode 0x5C
-    abort();
+    ld_r8_r8(&cpu->E, &cpu->H, cpu);
 }
 void cpu_op_0x5D(CPUState *cpu)
 {
-    printf("Opcode 0x5D not implemented yet.\n"); // TODO: implementation de l'opcode 0x5D
-    abort();
+    ld_r8_r8(&cpu->E, &cpu->L, cpu);
 }
 void cpu_op_0x5E(CPUState *cpu)
 {
-    printf("Opcode 0x5E not implemented yet.\n"); // TODO: implementation de l'opcode 0x5E
-    abort();
+    ld_r8_hl(&cpu->E, cpu);
 }
 void cpu_op_0x5F(CPUState *cpu)
 {
-    printf("Opcode 0x5F not implemented yet.\n"); // TODO: implementation de l'opcode 0x5F
-    abort();
+    ld_r8_r8(&cpu->E, &cpu->A, cpu);
 }
 void cpu_op_0x60(CPUState *cpu)
 {
-    printf("Opcode 0x60 not implemented yet.\n"); // TODO: implementation de l'opcode 0x60
-    abort();
+    ld_r8_r8(&cpu->H, &cpu->B, cpu);
 }
 void cpu_op_0x61(CPUState *cpu)
 {
-    printf("Opcode 0x61 not implemented yet.\n"); // TODO: implementation de l'opcode 0x61
-    abort();
+    ld_r8_r8(&cpu->H, &cpu->C, cpu);
 }
 void cpu_op_0x62(CPUState *cpu)
 {
-    printf("Opcode 0x62 not implemented yet.\n"); // TODO: implementation de l'opcode 0x62
-    abort();
+    ld_r8_r8(&cpu->H, &cpu->D, cpu);
 }
 void cpu_op_0x63(CPUState *cpu)
 {
-    printf("Opcode 0x63 not implemented yet.\n"); // TODO: implementation de l'opcode 0x63
-    abort();
+    ld_r8_r8(&cpu->H, &cpu->E, cpu);
 }
 void cpu_op_0x64(CPUState *cpu)
 {
-    printf("Opcode 0x64 not implemented yet.\n"); // TODO: implementation de l'opcode 0x64
-    abort();
+    ld_r8_r8(&cpu->H, &cpu->H, cpu);
 }
 void cpu_op_0x65(CPUState *cpu)
 {
-    printf("Opcode 0x65 not implemented yet.\n"); // TODO: implementation de l'opcode 0x65
-    abort();
+    ld_r8_r8(&cpu->H, &cpu->L, cpu);
 }
 void cpu_op_0x66(CPUState *cpu)
 {
-    printf("Opcode 0x66 not implemented yet.\n"); // TODO: implementation de l'opcode 0x66
-    abort();
+    ld_r8_hl(&cpu->H, cpu);
 }
 void cpu_op_0x67(CPUState *cpu)
 {
-    printf("Opcode 0x67 not implemented yet.\n"); // TODO: implementation de l'opcode 0x67
-    abort();
+    ld_r8_r8(&cpu->H, &cpu->A, cpu);
 }
 void cpu_op_0x68(CPUState *cpu)
 {
-    printf("Opcode 0x68 not implemented yet.\n"); // TODO: implementation de l'opcode 0x68
-    abort();
+    ld_r8_r8(&cpu->L, &cpu->B, cpu);
 }
 void cpu_op_0x69(CPUState *cpu)
 {
-    printf("Opcode 0x69 not implemented yet.\n"); // TODO: implementation de l'opcode 0x69
-    abort();
+    ld_r8_r8(&cpu->L, &cpu->C, cpu);
 }
 void cpu_op_0x6A(CPUState *cpu)
 {
-    printf("Opcode 0x6A not implemented yet.\n"); // TODO: implementation de l'opcode 0x6A
-    abort();
+    ld_r8_r8(&cpu->L, &cpu->D, cpu);
 }
 void cpu_op_0x6B(CPUState *cpu)
 {
-    printf("Opcode 0x6B not implemented yet.\n"); // TODO: implementation de l'opcode 0x6B
-    abort();
+    ld_r8_r8(&cpu->L, &cpu->E, cpu);
 }
 void cpu_op_0x6C(CPUState *cpu)
 {
-    printf("Opcode 0x6C not implemented yet.\n"); // TODO: implementation de l'opcode 0x6C
-    abort();
+    ld_r8_r8(&cpu->L, &cpu->H, cpu);
 }
 void cpu_op_0x6D(CPUState *cpu)
 {
-    printf("Opcode 0x6D not implemented yet.\n"); // TODO: implementation de l'opcode 0x6D
-    abort();
+    ld_r8_r8(&cpu->L, &cpu->L, cpu);
 }
 void cpu_op_0x6E(CPUState *cpu)
 {
-    printf("Opcode 0x6E not implemented yet.\n"); // TODO: implementation de l'opcode 0x6E
-    abort();
+    ld_r8_hl(&cpu->L, cpu);
 }
 void cpu_op_0x6F(CPUState *cpu)
 {
-    printf("Opcode 0x6F not implemented yet.\n"); // TODO: implementation de l'opcode 0x6F
-    abort();
+    ld_r8_r8(&cpu->L, &cpu->A, cpu);
 }
 void cpu_op_0x70(CPUState *cpu)
 {
-    printf("Opcode 0x70 not implemented yet.\n"); // TODO: implementation de l'opcode 0x70
-    abort();
+    ld_hl_r8(cpu->B, cpu);
 }
 void cpu_op_0x71(CPUState *cpu)
 {
-    printf("Opcode 0x71 not implemented yet.\n"); // TODO: implementation de l'opcode 0x71
-    abort();
+    ld_hl_r8(cpu->C, cpu);
 }
 void cpu_op_0x72(CPUState *cpu)
 {
-    printf("Opcode 0x72 not implemented yet.\n"); // TODO: implementation de l'opcode 0x72
-    abort();
+    ld_hl_r8(cpu->D, cpu);
 }
 void cpu_op_0x73(CPUState *cpu)
 {
-    printf("Opcode 0x73 not implemented yet.\n"); // TODO: implementation de l'opcode 0x73
-    abort();
+    ld_hl_r8(cpu->E, cpu);
 }
 void cpu_op_0x74(CPUState *cpu)
 {
-    printf("Opcode 0x74 not implemented yet.\n"); // TODO: implementation de l'opcode 0x74
-    abort();
+    ld_hl_r8(cpu->H, cpu);
 }
 void cpu_op_0x75(CPUState *cpu)
 {
-    printf("Opcode 0x75 not implemented yet.\n"); // TODO: implementation de l'opcode 0x75
-    abort();
+    ld_hl_r8(cpu->L, cpu);
 }
 void cpu_op_0x76(CPUState *cpu)
 {
-    printf("Opcode 0x76 not implemented yet.\n"); // TODO: implementation de l'opcode 0x76
-    abort();
+    halt(cpu);
 }
 void cpu_op_0x77(CPUState *cpu)
 {
-    printf("Opcode 0x77 not implemented yet.\n"); // TODO: implementation de l'opcode 0x77
-    abort();
+    ld_hl_r8(cpu->A, cpu);
 }
 void cpu_op_0x78(CPUState *cpu)
 {
-    printf("Opcode 0x78 not implemented yet.\n"); // TODO: implementation de l'opcode 0x78
-    abort();
+    ld_r8_r8(&cpu->A, &cpu->B, cpu);
 }
 void cpu_op_0x79(CPUState *cpu)
 {
-    printf("Opcode 0x79 not implemented yet.\n"); // TODO: implementation de l'opcode 0x79
-    abort();
+    ld_r8_r8(&cpu->A, &cpu->C, cpu);
 }
 void cpu_op_0x7A(CPUState *cpu)
 {
-    printf("Opcode 0x7A not implemented yet.\n"); // TODO: implementation de l'opcode 0x7A
-    abort();
+    ld_r8_r8(&cpu->A, &cpu->D, cpu);
 }
 void cpu_op_0x7B(CPUState *cpu)
 {
-    printf("Opcode 0x7B not implemented yet.\n"); // TODO: implementation de l'opcode 0x7B
-    abort();
+    ld_r8_r8(&cpu->A, &cpu->E, cpu);
 }
 void cpu_op_0x7C(CPUState *cpu)
 {
-    printf("Opcode 0x7C not implemented yet.\n"); // TODO: implementation de l'opcode 0x7C
-    abort();
+    ld_r8_r8(&cpu->A, &cpu->H, cpu);
 }
 void cpu_op_0x7D(CPUState *cpu)
 {
-    printf("Opcode 0x7D not implemented yet.\n"); // TODO: implementation de l'opcode 0x7D
-    abort();
+    ld_r8_r8(&cpu->A, &cpu->L, cpu);
 }
 void cpu_op_0x7E(CPUState *cpu)
 {
-    printf("Opcode 0x7E not implemented yet.\n"); // TODO: implementation de l'opcode 0x7E
-    abort();
+    ld_r8_hl(&cpu->A, cpu);
 }
 void cpu_op_0x7F(CPUState *cpu)
 {
-    printf("Opcode 0x7F not implemented yet.\n"); // TODO: implementation de l'opcode 0x7F
-    abort();
+    ld_r8_r8(&cpu->A, &cpu->A, cpu);
 }
 void cpu_op_0x80(CPUState *cpu)
 {
-    printf("Opcode 0x80 not implemented yet.\n"); // TODO: implementation de l'opcode 0x80
-    abort();
+    add_a_r8(cpu->B, cpu);
 }
 void cpu_op_0x81(CPUState *cpu)
 {
-    printf("Opcode 0x81 not implemented yet.\n"); // TODO: implementation de l'opcode 0x81
-    abort();
+    add_a_r8(cpu->C, cpu);
 }
 void cpu_op_0x82(CPUState *cpu)
 {
-    printf("Opcode 0x82 not implemented yet.\n"); // TODO: implementation de l'opcode 0x82
-    abort();
+    add_a_r8(cpu->D, cpu);
 }
 void cpu_op_0x83(CPUState *cpu)
 {
-    printf("Opcode 0x83 not implemented yet.\n"); // TODO: implementation de l'opcode 0x83
-    abort();
+    add_a_r8(cpu->E, cpu);
 }
 void cpu_op_0x84(CPUState *cpu)
 {
-    printf("Opcode 0x84 not implemented yet.\n"); // TODO: implementation de l'opcode 0x84
-    abort();
+    add_a_r8(cpu->H, cpu);
 }
 void cpu_op_0x85(CPUState *cpu)
 {
-    printf("Opcode 0x85 not implemented yet.\n"); // TODO: implementation de l'opcode 0x85
-    abort();
+    add_a_r8(cpu->L, cpu);
 }
 void cpu_op_0x86(CPUState *cpu)
 {
-    printf("Opcode 0x86 not implemented yet.\n"); // TODO: implementation de l'opcode 0x86
-    abort();
+    add_a_hl(cpu);
 }
 void cpu_op_0x87(CPUState *cpu)
 {
-    printf("Opcode 0x87 not implemented yet.\n"); // TODO: implementation de l'opcode 0x87
-    abort();
+    add_a_r8(cpu->A, cpu);
 }
 void cpu_op_0x88(CPUState *cpu)
 {
-    printf("Opcode 0x88 not implemented yet.\n"); // TODO: implementation de l'opcode 0x88
-    abort();
+    adc_a_r8(cpu->B, cpu);
 }
 void cpu_op_0x89(CPUState *cpu)
 {
-    printf("Opcode 0x89 not implemented yet.\n"); // TODO: implementation de l'opcode 0x89
-    abort();
+    adc_a_r8(cpu->C, cpu);
 }
 void cpu_op_0x8A(CPUState *cpu)
 {
-    printf("Opcode 0x8A not implemented yet.\n"); // TODO: implementation de l'opcode 0x8A
-    abort();
+    adc_a_r8(cpu->D, cpu);
 }
 void cpu_op_0x8B(CPUState *cpu)
 {
-    printf("Opcode 0x8B not implemented yet.\n"); // TODO: implementation de l'opcode 0x8B
-    abort();
+    adc_a_r8(cpu->E, cpu);
 }
 void cpu_op_0x8C(CPUState *cpu)
 {
-    printf("Opcode 0x8C not implemented yet.\n"); // TODO: implementation de l'opcode 0x8C
-    abort();
+    adc_a_r8(cpu->H, cpu);
 }
 void cpu_op_0x8D(CPUState *cpu)
 {
-    printf("Opcode 0x8D not implemented yet.\n"); // TODO: implementation de l'opcode 0x8D
-    abort();
+    adc_a_r8(cpu->L, cpu);
 }
 void cpu_op_0x8E(CPUState *cpu)
 {
-    printf("Opcode 0x8E not implemented yet.\n"); // TODO: implementation de l'opcode 0x8E
-    abort();
+    adc_a_hl(cpu);
 }
 void cpu_op_0x8F(CPUState *cpu)
 {
-    printf("Opcode 0x8F not implemented yet.\n"); // TODO: implementation de l'opcode 0x8F
-    abort();
+    adc_a_r8(cpu->A, cpu);
 }
 void cpu_op_0x90(CPUState *cpu)
 {
-    printf("Opcode 0x90 not implemented yet.\n"); // TODO: implementation de l'opcode 0x90
-    abort();
+    sub_r8(cpu->B, cpu);
 }
 void cpu_op_0x91(CPUState *cpu)
 {
-    printf("Opcode 0x91 not implemented yet.\n"); // TODO: implementation de l'opcode 0x91
-    abort();
+    sub_r8(cpu->C, cpu);
 }
 void cpu_op_0x92(CPUState *cpu)
 {
-    printf("Opcode 0x92 not implemented yet.\n"); // TODO: implementation de l'opcode 0x92
-    abort();
+    sub_r8(cpu->D, cpu);
 }
 void cpu_op_0x93(CPUState *cpu)
 {
-    printf("Opcode 0x93 not implemented yet.\n"); // TODO: implementation de l'opcode 0x93
-    abort();
+    sub_r8(cpu->E, cpu);
 }
 void cpu_op_0x94(CPUState *cpu)
 {
-    printf("Opcode 0x94 not implemented yet.\n"); // TODO: implementation de l'opcode 0x94
-    abort();
+    sub_r8(cpu->H, cpu);
 }
 void cpu_op_0x95(CPUState *cpu)
 {
-    printf("Opcode 0x95 not implemented yet.\n"); // TODO: implementation de l'opcode 0x95
-    abort();
+    sub_r8(cpu->L, cpu);
 }
 void cpu_op_0x96(CPUState *cpu)
 {
-    printf("Opcode 0x96 not implemented yet.\n"); // TODO: implementation de l'opcode 0x96
-    abort();
+    sub_hl(cpu);
 }
 void cpu_op_0x97(CPUState *cpu)
 {
-    printf("Opcode 0x97 not implemented yet.\n"); // TODO: implementation de l'opcode 0x97
-    abort();
+    sub_r8(cpu->A, cpu);
 }
 void cpu_op_0x98(CPUState *cpu)
 {
-    printf("Opcode 0x98 not implemented yet.\n"); // TODO: implementation de l'opcode 0x98
-    abort();
+    sbc_a_r8(cpu->B, cpu);
 }
 void cpu_op_0x99(CPUState *cpu)
 {
-    printf("Opcode 0x99 not implemented yet.\n"); // TODO: implementation de l'opcode 0x99
-    abort();
+    sbc_a_r8(cpu->C, cpu);
 }
 void cpu_op_0x9A(CPUState *cpu)
 {
-    printf("Opcode 0x9A not implemented yet.\n"); // TODO: implementation de l'opcode 0x9A
-    abort();
+    sbc_a_r8(cpu->D, cpu);
 }
 void cpu_op_0x9B(CPUState *cpu)
 {
-    printf("Opcode 0x9B not implemented yet.\n"); // TODO: implementation de l'opcode 0x9B
-    abort();
+    sbc_a_r8(cpu->E, cpu);
 }
 void cpu_op_0x9C(CPUState *cpu)
 {
-    printf("Opcode 0x9C not implemented yet.\n"); // TODO: implementation de l'opcode 0x9C
-    abort();
+    sbc_a_r8(cpu->H, cpu);
 }
 void cpu_op_0x9D(CPUState *cpu)
 {
-    printf("Opcode 0x9D not implemented yet.\n"); // TODO: implementation de l'opcode 0x9D
-    abort();
+    sbc_a_r8(cpu->L, cpu);
 }
 void cpu_op_0x9E(CPUState *cpu)
 {
-    printf("Opcode 0x9E not implemented yet.\n"); // TODO: implementation de l'opcode 0x9E
-    abort();
+    sbc_a_hl(cpu);
 }
 void cpu_op_0x9F(CPUState *cpu)
 {
-    printf("Opcode 0x9F not implemented yet.\n"); // TODO: implementation de l'opcode 0x9F
-    abort();
+    sbc_a_r8(cpu->A, cpu);
 }
 void cpu_op_0xA0(CPUState *cpu)
 {
-    printf("Opcode 0xA0 not implemented yet.\n"); // TODO: implementation de l'opcode 0xA0
-    abort();
+    and_r8(cpu->B, cpu);
 }
 void cpu_op_0xA1(CPUState *cpu)
 {
-    printf("Opcode 0xA1 not implemented yet.\n"); // TODO: implementation de l'opcode 0xA1
-    abort();
+    and_r8(cpu->C, cpu);
 }
 void cpu_op_0xA2(CPUState *cpu)
 {
-    printf("Opcode 0xA2 not implemented yet.\n"); // TODO: implementation de l'opcode 0xA2
-    abort();
+    and_r8(cpu->D, cpu);
 }
 void cpu_op_0xA3(CPUState *cpu)
 {
-    printf("Opcode 0xA3 not implemented yet.\n"); // TODO: implementation de l'opcode 0xA3
-    abort();
+    and_r8(cpu->E, cpu);
 }
 void cpu_op_0xA4(CPUState *cpu)
 {
-    printf("Opcode 0xA4 not implemented yet.\n"); // TODO: implementation de l'opcode 0xA4
-    abort();
+    and_r8(cpu->H, cpu);
 }
 void cpu_op_0xA5(CPUState *cpu)
 {
-    printf("Opcode 0xA5 not implemented yet.\n"); // TODO: implementation de l'opcode 0xA5
-    abort();
+    and_r8(cpu->L, cpu);
 }
 void cpu_op_0xA6(CPUState *cpu)
 {
-    printf("Opcode 0xA6 not implemented yet.\n"); // TODO: implementation de l'opcode 0xA6
-    abort();
+    and_hl(cpu);
 }
 void cpu_op_0xA7(CPUState *cpu)
 {
-    printf("Opcode 0xA7 not implemented yet.\n"); // TODO: implementation de l'opcode 0xA7
-    abort();
+    and_r8(cpu->A, cpu);
 }
 void cpu_op_0xA8(CPUState *cpu)
 {
-    printf("Opcode 0xA8 not implemented yet.\n"); // TODO: implementation de l'opcode 0xA8
-    abort();
+    xor_a_r8(cpu->B, cpu);
 }
 void cpu_op_0xA9(CPUState *cpu)
 {
-    printf("Opcode 0xA9 not implemented yet.\n"); // TODO: implementation de l'opcode 0xA9
-    abort();
+    xor_a_r8(cpu->C, cpu);
 }
 void cpu_op_0xAA(CPUState *cpu)
 {
-    printf("Opcode 0xAA not implemented yet.\n"); // TODO: implementation de l'opcode 0xAA
-    abort();
+    xor_a_r8(cpu->D, cpu);
 }
 void cpu_op_0xAB(CPUState *cpu)
 {
-    printf("Opcode 0xAB not implemented yet.\n"); // TODO: implementation de l'opcode 0xAB
-    abort();
+    xor_a_r8(cpu->E, cpu);
 }
 void cpu_op_0xAC(CPUState *cpu)
 {
-    printf("Opcode 0xAC not implemented yet.\n"); // TODO: implementation de l'opcode 0xAC
-    abort();
+    xor_a_r8(cpu->H, cpu);
 }
 void cpu_op_0xAD(CPUState *cpu)
 {
-    printf("Opcode 0xAD not implemented yet.\n"); // TODO: implementation de l'opcode 0xAD
-    abort();
+    xor_a_r8(cpu->L, cpu);
 }
 void cpu_op_0xAE(CPUState *cpu)
 {
-    printf("Opcode 0xAE not implemented yet.\n"); // TODO: implementation de l'opcode 0xAE
-    abort();
+    xor_a_hl(cpu);
 }
 void cpu_op_0xAF(CPUState *cpu)
 {
@@ -873,336 +707,289 @@ void cpu_op_0xAF(CPUState *cpu)
 }
 void cpu_op_0xB0(CPUState *cpu)
 {
-    printf("Opcode 0xB0 not implemented yet.\n"); // TODO: implementation de l'opcode 0xB0
-    abort();
+    or_a_r8(cpu->B, cpu);
 }
 void cpu_op_0xB1(CPUState *cpu)
 {
-    printf("Opcode 0xB1 not implemented yet.\n"); // TODO: implementation de l'opcode 0xB1
-    abort();
+    or_a_r8(cpu->C, cpu);
 }
 void cpu_op_0xB2(CPUState *cpu)
 {
-    printf("Opcode 0xB2 not implemented yet.\n"); // TODO: implementation de l'opcode 0xB2
-    abort();
+    or_a_r8(cpu->D, cpu);
 }
 void cpu_op_0xB3(CPUState *cpu)
 {
-    printf("Opcode 0xB3 not implemented yet.\n"); // TODO: implementation de l'opcode 0xB3
-    abort();
+    or_a_r8(cpu->E, cpu);
 }
 void cpu_op_0xB4(CPUState *cpu)
 {
-    printf("Opcode 0xB4 not implemented yet.\n"); // TODO: implementation de l'opcode 0xB4
-    abort();
+    or_a_r8(cpu->H, cpu);
 }
 void cpu_op_0xB5(CPUState *cpu)
 {
-    printf("Opcode 0xB5 not implemented yet.\n"); // TODO: implementation de l'opcode 0xB5
-    abort();
+    or_a_r8(cpu->L, cpu);
 }
 void cpu_op_0xB6(CPUState *cpu)
 {
-    printf("Opcode 0xB6 not implemented yet.\n"); // TODO: implementation de l'opcode 0xB6
-    abort();
+    or_a_hl(cpu);
 }
 void cpu_op_0xB7(CPUState *cpu)
 {
-    printf("Opcode 0xB7 not implemented yet.\n"); // TODO: implementation de l'opcode 0xB7
-    abort();
+    or_a_r8(cpu->A, cpu);
 }
 void cpu_op_0xB8(CPUState *cpu)
 {
-    printf("Opcode 0xB8 not implemented yet.\n"); // TODO: implementation de l'opcode 0xB8
-    abort();
+    cp_a_r8(cpu->B, cpu);
 }
 void cpu_op_0xB9(CPUState *cpu)
 {
-    printf("Opcode 0xB9 not implemented yet.\n"); // TODO: implementation de l'opcode 0xB9
-    abort();
+    cp_a_r8(cpu->C, cpu);
 }
 void cpu_op_0xBA(CPUState *cpu)
 {
-    printf("Opcode 0xBA not implemented yet.\n"); // TODO: implementation de l'opcode 0xBA
-    abort();
+    cp_a_r8(cpu->D, cpu);
 }
 void cpu_op_0xBB(CPUState *cpu)
 {
-    printf("Opcode 0xBB not implemented yet.\n"); // TODO: implementation de l'opcode 0xBB
-    abort();
+    cp_a_r8(cpu->E, cpu);
 }
 void cpu_op_0xBC(CPUState *cpu)
 {
-    printf("Opcode 0xBC not implemented yet.\n"); // TODO: implementation de l'opcode 0xBC
-    abort();
+    cp_a_r8(cpu->H, cpu);
 }
 void cpu_op_0xBD(CPUState *cpu)
 {
-    printf("Opcode 0xBD not implemented yet.\n"); // TODO: implementation de l'opcode 0xBD
-    abort();
+    cp_a_r8(cpu->L, cpu);
 }
 void cpu_op_0xBE(CPUState *cpu)
 {
-    printf("Opcode 0xBE not implemented yet.\n"); // TODO: implementation de l'opcode 0xBE
-    abort();
+    cp_a_hl(cpu);
 }
 void cpu_op_0xBF(CPUState *cpu)
 {
-    printf("Opcode 0xBF not implemented yet.\n"); // TODO: implementation de l'opcode 0xBF
-    abort();
+    cp_a_r8(cpu->A, cpu);
 }
 void cpu_op_0xC0(CPUState *cpu)
 {
-    printf("Opcode 0xC0 not implemented yet.\n"); // TODO: implementation de l'opcode 0xC0
-    abort();
+    ret_cc((cpu->F & (1 << 7)) == 0, cpu);
 }
 void cpu_op_0xC1(CPUState *cpu)
 {
-    printf("Opcode 0xC1 not implemented yet.\n"); // TODO: implementation de l'opcode 0xC1
-    abort();
+    pop_r16(&cpu->BC, cpu);
 }
 void cpu_op_0xC2(CPUState *cpu)
 {
-    printf("Opcode 0xC2 not implemented yet.\n"); // TODO: implementation de l'opcode 0xC2
-    abort();
+    jp_cc_n16((cpu->F & (1 << 7)) == 0, cpu);
 }
 void cpu_op_0xC3(CPUState *cpu)
 {
-    jp_n16(cpu->memory->data[cpu->PC] | (cpu->memory->data[cpu->PC + 1] << 8), cpu);
+    jp_n16(cpu);
 }
 void cpu_op_0xC4(CPUState *cpu)
 {
-    printf("Opcode 0xC4 not implemented yet.\n"); // TODO: implementation de l'opcode 0xC4
-    abort();
+    call_cc_n16((cpu->F & FLAG_Z) == 0, cpu);
 }
 void cpu_op_0xC5(CPUState *cpu)
 {
-    printf("Opcode 0xC5 not implemented yet.\n"); // TODO: implementation de l'opcode 0xC5
-    abort();
+    push_r16(cpu->BC, cpu);
 }
 void cpu_op_0xC6(CPUState *cpu)
 {
-    printf("Opcode 0xC6 not implemented yet.\n"); // TODO: implementation de l'opcode 0xC6
-    abort();
+    add_a_n8(memory_read(cpu->memory, cpu->PC++), cpu);
 }
 void cpu_op_0xC7(CPUState *cpu)
 {
-    printf("Opcode 0xC7 not implemented yet.\n"); // TODO: implementation de l'opcode 0xC7
-    abort();
+    rst(0, cpu);
 }
 void cpu_op_0xC8(CPUState *cpu)
 {
-    printf("Opcode 0xC8 not implemented yet.\n"); // TODO: implementation de l'opcode 0xC8
-    abort();
+    ret_cc((cpu->F & FLAG_Z) != 0, cpu);
 }
 void cpu_op_0xC9(CPUState *cpu)
 {
-    printf("Opcode 0xC9 not implemented yet.\n"); // TODO: implementation de l'opcode 0xC9
-    abort();
+    ret(cpu);
 }
 void cpu_op_0xCA(CPUState *cpu)
 {
-    printf("Opcode 0xCA not implemented yet.\n"); // TODO: implementation de l'opcode 0xCA
-    abort();
+    jp_cc_n16((cpu->F & FLAG_Z) != 0, cpu);
 }
 void cpu_op_0xCB(CPUState *cpu)
 {
-    printf("Opcode 0xCB not implemented yet.\n"); // TODO: implementation de l'opcode 0xCB
-    abort();
+    uint8_t cb_opcode = memory_read(cpu->memory, cpu->PC++);
+    extended_opcodes[cb_opcode](cpu);
 }
 void cpu_op_0xCC(CPUState *cpu)
 {
-    printf("Opcode 0xCC not implemented yet.\n"); // TODO: implementation de l'opcode 0xCC
-    abort();
+    call_cc_n16((cpu->F & FLAG_Z) != 0, cpu);
 }
 void cpu_op_0xCD(CPUState *cpu)
 {
-    uint16_t addr = cpu->memory->data[cpu->PC++];
-    addr |= (cpu->memory->data[cpu->PC++] << 8);
-    call_n16(addr, cpu);
+    call_n16(cpu);
 }
 void cpu_op_0xCE(CPUState *cpu)
 {
-    printf("Opcode 0xCE not implemented yet.\n"); // TODO: implementation de l'opcode 0xCE
-    abort();
+    adc_a_n8(memory_read(cpu->memory, cpu->PC++), cpu);
 }
 void cpu_op_0xCF(CPUState *cpu)
 {
-    printf("Opcode 0xCF not implemented yet.\n"); // TODO: implementation de l'opcode 0xCF
-    abort();
+    rst(1, cpu);
 }
 void cpu_op_0xD0(CPUState *cpu)
 {
-    printf("Opcode 0xD0 not implemented yet.\n"); // TODO: implementation de l'opcode 0xD0
-    abort();
+    ret_cc((cpu->F & FLAG_C) == 0, cpu);
 }
 void cpu_op_0xD1(CPUState *cpu)
 {
-    printf("Opcode 0xD1 not implemented yet.\n"); // TODO: implementation de l'opcode 0xD1
-    abort();
+    pop_r16(&cpu->DE, cpu);
 }
 void cpu_op_0xD2(CPUState *cpu)
 {
-    printf("Opcode 0xD2 not implemented yet.\n"); // TODO: implementation de l'opcode 0xD2
-    abort();
+    jp_cc_n16((cpu->F & FLAG_C) == 0, cpu);
 }
 void cpu_op_0xD3(CPUState *cpu)
 {
     printf("Opcode 0xD3 not implemented yet.\n"); // TODO: implementation de l'opcode 0xD3
+    printf("PC: 0x%04X", cpu->PC);
     abort();
 }
 void cpu_op_0xD4(CPUState *cpu)
 {
-    printf("Opcode 0xD4 not implemented yet.\n"); // TODO: implementation de l'opcode 0xD4
-    abort();
+    call_cc_n16((cpu->F & FLAG_C) == 0, cpu);
 }
 void cpu_op_0xD5(CPUState *cpu)
 {
-    printf("Opcode 0xD5 not implemented yet.\n"); // TODO: implementation de l'opcode 0xD5
-    abort();
+    push_r16(cpu->DE, cpu);
 }
 void cpu_op_0xD6(CPUState *cpu)
 {
-    printf("Opcode 0xD6 not implemented yet.\n"); // TODO: implementation de l'opcode 0xD6
-    abort();
+    sub_n8(memory_read(cpu->memory, cpu->PC++), cpu);
 }
 void cpu_op_0xD7(CPUState *cpu)
 {
-    printf("Opcode 0xD7 not implemented yet.\n"); // TODO: implementation de l'opcode 0xD7
-    abort();
+    rst(2, cpu);
 }
 void cpu_op_0xD8(CPUState *cpu)
 {
-    printf("Opcode 0xD8 not implemented yet.\n"); // TODO: implementation de l'opcode 0xD8
-    abort();
+    ret_cc((cpu->F & FLAG_C) != 0, cpu);
 }
 void cpu_op_0xD9(CPUState *cpu)
 {
-    printf("Opcode 0xD9 not implemented yet.\n"); // TODO: implementation de l'opcode 0xD9
-    abort();
+    reti(cpu);
 }
 void cpu_op_0xDA(CPUState *cpu)
 {
-    printf("Opcode 0xDA not implemented yet.\n"); // TODO: implementation de l'opcode 0xDA
-    abort();
+    jp_cc_n16((cpu->F & FLAG_C) != 0, cpu);
 }
 void cpu_op_0xDB(CPUState *cpu)
 {
     printf("Opcode 0xDB not implemented yet.\n"); // TODO: implementation de l'opcode 0xDB
+    printf("PC: 0x%04X", cpu->PC);
     abort();
 }
 void cpu_op_0xDC(CPUState *cpu)
 {
-    printf("Opcode 0xDC not implemented yet.\n"); // TODO: implementation de l'opcode 0xDC
-    abort();
+    call_cc_n16((cpu->F & FLAG_C) != 0, cpu);
 }
 void cpu_op_0xDD(CPUState *cpu)
 {
     printf("Opcode 0xDD not implemented yet.\n"); // TODO: implementation de l'opcode 0xDD
+    printf("PC: 0x%04X", cpu->PC);
     abort();
 }
 void cpu_op_0xDE(CPUState *cpu)
 {
-    printf("Opcode 0xDE not implemented yet.\n"); // TODO: implementation de l'opcode 0xDE
-    abort();
+    sbc_a_n8(cpu);
 }
 void cpu_op_0xDF(CPUState *cpu)
 {
-    printf("Opcode 0xDF not implemented yet.\n"); // TODO: implementation de l'opcode 0xDF
-    abort();
+    rst(3, cpu);
 }
 void cpu_op_0xE0(CPUState *cpu)
 {
-    ldh_n8_a(cpu->memory->data[cpu->PC++], cpu);
+    ldh_n8_a(memory_read(cpu->memory, cpu->PC++), cpu);
 }
 void cpu_op_0xE1(CPUState *cpu)
 {
-    printf("Opcode 0xE1 not implemented yet.\n"); // TODO: implementation de l'opcode 0xE1
-    abort();
+    pop_r16(&cpu->HL, cpu);
 }
 void cpu_op_0xE2(CPUState *cpu)
 {
-    printf("Opcode 0xE2 not implemented yet.\n"); // TODO: implementation de l'opcode 0xE2
-    abort();
+    ldh_c_a(cpu);
 }
 void cpu_op_0xE3(CPUState *cpu)
 {
     printf("Opcode 0xE3 not implemented yet.\n"); // TODO: implementation de l'opcode 0xE3
+    printf("PC: 0x%04X", cpu->PC);
     abort();
 }
 void cpu_op_0xE4(CPUState *cpu)
 {
     printf("Opcode 0xE4 not implemented yet.\n"); // TODO: implementation de l'opcode 0xE4
+    printf("PC: 0x%04X", cpu->PC);
     abort();
 }
 void cpu_op_0xE5(CPUState *cpu)
 {
-    printf("Opcode 0xE5 not implemented yet.\n"); // TODO: implementation de l'opcode 0xE5
-    abort();
+    push_r16(cpu->HL, cpu);
 }
 void cpu_op_0xE6(CPUState *cpu)
 {
-    printf("Opcode 0xE6 not implemented yet.\n"); // TODO: implementation de l'opcode 0xE6
-    abort();
+    and_n8(memory_read(cpu->memory, cpu->PC++), cpu);
 }
 void cpu_op_0xE7(CPUState *cpu)
 {
-    printf("Opcode 0xE7 not implemented yet.\n"); // TODO: implementation de l'opcode 0xE7
-    abort();
+    rst(4, cpu);
 }
 void cpu_op_0xE8(CPUState *cpu)
 {
-    printf("Opcode 0xE8 not implemented yet.\n"); // TODO: implementation de l'opcode 0xE8
-    abort();
+    add_sp_e8(cpu);
 }
 void cpu_op_0xE9(CPUState *cpu)
 {
-    printf("Opcode 0xE9 not implemented yet.\n"); // TODO: implementation de l'opcode 0xE9
-    abort();
+    jp_hl(cpu);
 }
 void cpu_op_0xEA(CPUState *cpu)
 {
-    printf("Opcode 0xEA not implemented yet.\n"); // TODO: implementation de l'opcode 0xEA
-    abort();
+    ld_n16_a(memory_read(cpu->memory, cpu->PC) | (memory_read(cpu->memory, cpu->PC + 1) << 8), cpu);
+    cpu->PC += 2;
 }
 void cpu_op_0xEB(CPUState *cpu)
 {
     printf("Opcode 0xEB not implemented yet.\n"); // TODO: implementation de l'opcode 0xEB
+    printf("PC: 0x%04X", cpu->PC);
     abort();
 }
 void cpu_op_0xEC(CPUState *cpu)
 {
     printf("Opcode 0xEC not implemented yet.\n"); // TODO: implementation de l'opcode 0xEC
+    printf("PC: 0x%04X", cpu->PC);
     abort();
 }
 void cpu_op_0xED(CPUState *cpu)
 {
     printf("Opcode 0xED not implemented yet.\n"); // TODO: implementation de l'opcode 0xED
+    printf("PC: 0x%04X", cpu->PC);
     abort();
 }
 void cpu_op_0xEE(CPUState *cpu)
 {
-    printf("Opcode 0xEE not implemented yet.\n"); // TODO: implementation de l'opcode 0xEE
-    abort();
+    xor_a_n8(memory_read(cpu->memory, cpu->PC++), cpu);
 }
 void cpu_op_0xEF(CPUState *cpu)
 {
-    printf("Opcode 0xEF not implemented yet.\n"); // TODO: implementation de l'opcode 0xEF
-    abort();
+    rst(5, cpu);
 }
 void cpu_op_0xF0(CPUState *cpu)
 {
-    ldh_a_n8(cpu->memory->data[cpu->PC++], cpu);
+    ldh_a_a8(cpu);
 }
 void cpu_op_0xF1(CPUState *cpu)
 {
-    printf("Opcode 0xF1 not implemented yet.\n"); // TODO: implementation de l'opcode 0xF1
-    abort();
+    pop_af(cpu);
 }
 void cpu_op_0xF2(CPUState *cpu)
 {
-    printf("Opcode 0xF2 not implemented yet.\n"); // TODO: implementation de l'opcode 0xF2
-    abort();
+    ldh_a_c(cpu);
 }
 void cpu_op_0xF3(CPUState *cpu)
 {
@@ -1211,37 +998,32 @@ void cpu_op_0xF3(CPUState *cpu)
 void cpu_op_0xF4(CPUState *cpu)
 {
     printf("Opcode 0xF4 not implemented yet.\n"); // TODO: implementation de l'opcode 0xF4
+    printf("PC: 0x%04X", cpu->PC);
     abort();
 }
 void cpu_op_0xF5(CPUState *cpu)
 {
-    printf("Opcode 0xF5 not implemented yet.\n"); // TODO: implementation de l'opcode 0xF5
-    abort();
+    push_af(cpu);
 }
 void cpu_op_0xF6(CPUState *cpu)
 {
-    printf("Opcode 0xF6 not implemented yet.\n"); // TODO: implementation de l'opcode 0xF6
-    abort();
+    or_a_n8(memory_read(cpu->memory, cpu->PC++), cpu);
 }
 void cpu_op_0xF7(CPUState *cpu)
 {
-    printf("Opcode 0xF7 not implemented yet.\n"); // TODO: implementation de l'opcode 0xF7
-    abort();
+    rst(6, cpu);
 }
 void cpu_op_0xF8(CPUState *cpu)
 {
-    printf("Opcode 0xF8 not implemented yet.\n"); // TODO: implementation de l'opcode 0xF8
-    abort();
+    ld_hl_sp_e8(cpu);
 }
 void cpu_op_0xF9(CPUState *cpu)
 {
-    printf("Opcode 0xF9 not implemented yet.\n"); // TODO: implementation de l'opcode 0xF9
-    abort();
+    ld_sp_hl(cpu);
 }
 void cpu_op_0xFA(CPUState *cpu)
 {
-    printf("Opcode 0xFA not implemented yet.\n"); // TODO: implementation de l'opcode 0xFA
-    abort();
+    ld_a_n16(cpu);
 }
 void cpu_op_0xFB(CPUState *cpu)
 {
@@ -1250,21 +1032,1047 @@ void cpu_op_0xFB(CPUState *cpu)
 void cpu_op_0xFC(CPUState *cpu)
 {
     printf("Opcode 0xFC not implemented yet.\n"); // TODO: implementation de l'opcode 0xFC
+    printf("PC: 0x%04X", cpu->PC);
     abort();
 }
 void cpu_op_0xFD(CPUState *cpu)
 {
     printf("Opcode 0xFD not implemented yet.\n"); // TODO: implementation de l'opcode 0xFD
+    printf("PC: 0x%04X", cpu->PC);
     abort();
 }
 void cpu_op_0xFE(CPUState *cpu)
 {
-    cp_a_n8(cpu->memory->data[cpu->PC++], cpu);
+    cp_a_n8(memory_read(cpu->memory, cpu->PC++), cpu);
 }
 void cpu_op_0xFF(CPUState *cpu)
 {
-    printf("Opcode 0xFF not implemented yet.\n"); // TODO: implementation de l'opcode 0xFF
-    abort();
+    rst(7, cpu);
+}
+
+void cpu_op_0xCB00(CPUState *cpu)
+{
+    rlc_r8(&cpu->B, cpu);
+}
+void cpu_op_0xCB01(CPUState *cpu)
+{
+    rlc_r8(&cpu->C, cpu);
+}
+void cpu_op_0xCB02(CPUState *cpu)
+{
+    rlc_r8(&cpu->D, cpu);
+}
+void cpu_op_0xCB03(CPUState *cpu)
+{
+    rlc_r8(&cpu->E, cpu);
+}
+void cpu_op_0xCB04(CPUState *cpu)
+{
+    rlc_r8(&cpu->H, cpu);
+}
+void cpu_op_0xCB05(CPUState *cpu)
+{
+    rlc_r8(&cpu->L, cpu);
+}
+void cpu_op_0xCB06(CPUState *cpu)
+{
+    rlc_hl(cpu);
+}
+void cpu_op_0xCB07(CPUState *cpu)
+{
+    rlc_r8(&cpu->A, cpu);
+}
+void cpu_op_0xCB08(CPUState *cpu)
+{
+    rrc_r8(&cpu->B, cpu);
+}
+void cpu_op_0xCB09(CPUState *cpu)
+{
+    rrc_r8(&cpu->C, cpu);
+}
+void cpu_op_0xCB0A(CPUState *cpu)
+{
+    rrc_r8(&cpu->D, cpu);
+}
+void cpu_op_0xCB0B(CPUState *cpu)
+{
+    rrc_r8(&cpu->E, cpu);
+}
+void cpu_op_0xCB0C(CPUState *cpu)
+{
+    rrc_r8(&cpu->H, cpu);
+}
+void cpu_op_0xCB0D(CPUState *cpu)
+{
+    rrc_r8(&cpu->L, cpu);
+}
+void cpu_op_0xCB0E(CPUState *cpu)
+{
+    rrc_hl(cpu);
+}
+void cpu_op_0xCB0F(CPUState *cpu)
+{
+    rrc_r8(&cpu->A, cpu);
+}
+void cpu_op_0xCB10(CPUState *cpu)
+{
+    rl_r8(&cpu->B, cpu);
+}
+void cpu_op_0xCB11(CPUState *cpu)
+{
+    rl_r8(&cpu->C, cpu);
+}
+void cpu_op_0xCB12(CPUState *cpu)
+{
+    rl_r8(&cpu->D, cpu);
+}
+void cpu_op_0xCB13(CPUState *cpu)
+{
+    rl_r8(&cpu->E, cpu);
+}
+void cpu_op_0xCB14(CPUState *cpu)
+{
+    rl_r8(&cpu->H, cpu);
+}
+void cpu_op_0xCB15(CPUState *cpu)
+{
+    rl_r8(&cpu->L, cpu);
+}
+void cpu_op_0xCB16(CPUState *cpu)
+{
+    rl_hl(cpu);
+}
+void cpu_op_0xCB17(CPUState *cpu)
+{
+    rl_r8(&cpu->A, cpu);
+}
+void cpu_op_0xCB18(CPUState *cpu)
+{
+    rr_r8(&cpu->B, cpu);
+}
+void cpu_op_0xCB19(CPUState *cpu)
+{
+    rr_r8(&cpu->C, cpu);
+}
+void cpu_op_0xCB1A(CPUState *cpu)
+{
+    rr_r8(&cpu->D, cpu);
+}
+void cpu_op_0xCB1B(CPUState *cpu)
+{
+    rr_r8(&cpu->E, cpu);
+}
+void cpu_op_0xCB1C(CPUState *cpu)
+{
+    rr_r8(&cpu->H, cpu);
+}
+void cpu_op_0xCB1D(CPUState *cpu)
+{
+    rr_r8(&cpu->L, cpu);
+}
+void cpu_op_0xCB1E(CPUState *cpu)
+{
+    rr_hl(cpu);
+}
+void cpu_op_0xCB1F(CPUState *cpu)
+{
+    rr_r8(&cpu->A, cpu);
+}
+void cpu_op_0xCB20(CPUState *cpu)
+{
+    sla_r8(&cpu->B, cpu);
+}
+void cpu_op_0xCB21(CPUState *cpu)
+{
+    sla_r8(&cpu->C, cpu);
+}
+void cpu_op_0xCB22(CPUState *cpu)
+{
+    sla_r8(&cpu->D, cpu);
+}
+void cpu_op_0xCB23(CPUState *cpu)
+{
+    sla_r8(&cpu->E, cpu);
+}
+void cpu_op_0xCB24(CPUState *cpu)
+{
+    sla_r8(&cpu->H, cpu);
+}
+void cpu_op_0xCB25(CPUState *cpu)
+{
+    sla_r8(&cpu->L, cpu);
+}
+void cpu_op_0xCB26(CPUState *cpu)
+{
+    sla_hl(cpu);
+}
+void cpu_op_0xCB27(CPUState *cpu)
+{
+    sla_r8(&cpu->A, cpu);
+}
+void cpu_op_0xCB28(CPUState *cpu)
+{
+    sra_r8(&cpu->B, cpu);
+}
+void cpu_op_0xCB29(CPUState *cpu)
+{
+    sra_r8(&cpu->C, cpu);
+}
+void cpu_op_0xCB2A(CPUState *cpu)
+{
+    sra_r8(&cpu->D, cpu);
+}
+void cpu_op_0xCB2B(CPUState *cpu)
+{
+    sra_r8(&cpu->E, cpu);
+}
+void cpu_op_0xCB2C(CPUState *cpu)
+{
+    sra_r8(&cpu->H, cpu);
+}
+void cpu_op_0xCB2D(CPUState *cpu)
+{
+    sra_r8(&cpu->L, cpu);
+}
+void cpu_op_0xCB2E(CPUState *cpu)
+{
+    sra_hl(cpu);
+}
+void cpu_op_0xCB2F(CPUState *cpu)
+{
+    sra_r8(&cpu->A, cpu);
+}
+void cpu_op_0xCB30(CPUState *cpu)
+{
+    swap_r8(&cpu->B, cpu);
+}
+void cpu_op_0xCB31(CPUState *cpu)
+{
+    swap_r8(&cpu->C, cpu);
+}
+void cpu_op_0xCB32(CPUState *cpu)
+{
+    swap_r8(&cpu->D, cpu);
+}
+void cpu_op_0xCB33(CPUState *cpu)
+{
+    swap_r8(&cpu->E, cpu);
+}
+void cpu_op_0xCB34(CPUState *cpu)
+{
+    swap_r8(&cpu->H, cpu);
+}
+void cpu_op_0xCB35(CPUState *cpu)
+{
+    swap_r8(&cpu->L, cpu);
+}
+void cpu_op_0xCB36(CPUState *cpu)
+{
+    swap_hl(cpu);
+}
+void cpu_op_0xCB37(CPUState *cpu)
+{
+    swap_r8(&cpu->A, cpu);
+}
+void cpu_op_0xCB38(CPUState *cpu)
+{
+    srl_r8(&cpu->B, cpu);
+}
+void cpu_op_0xCB39(CPUState *cpu)
+{
+    srl_r8(&cpu->C, cpu);
+}
+void cpu_op_0xCB3A(CPUState *cpu)
+{
+    srl_r8(&cpu->D, cpu);
+}
+void cpu_op_0xCB3B(CPUState *cpu)
+{
+    srl_r8(&cpu->E, cpu);
+}
+void cpu_op_0xCB3C(CPUState *cpu)
+{
+    srl_r8(&cpu->H, cpu);
+}
+void cpu_op_0xCB3D(CPUState *cpu)
+{
+    srl_r8(&cpu->L, cpu);
+}
+void cpu_op_0xCB3E(CPUState *cpu)
+{
+    srl_hl(cpu);
+}
+void cpu_op_0xCB3F(CPUState *cpu)
+{
+    srl_r8(&cpu->A, cpu);
+}
+void cpu_op_0xCB40(CPUState *cpu)
+{
+    bit_u3_r8(0, cpu->B, cpu);
+}
+void cpu_op_0xCB41(CPUState *cpu)
+{
+    bit_u3_r8(0, cpu->C, cpu);
+}
+void cpu_op_0xCB42(CPUState *cpu)
+{
+    bit_u3_r8(0, cpu->D, cpu);
+}
+void cpu_op_0xCB43(CPUState *cpu)
+{
+    bit_u3_r8(0, cpu->E, cpu);
+}
+void cpu_op_0xCB44(CPUState *cpu)
+{
+    bit_u3_r8(0, cpu->H, cpu);
+}
+void cpu_op_0xCB45(CPUState *cpu)
+{
+    bit_u3_r8(0, cpu->L, cpu);
+}
+void cpu_op_0xCB46(CPUState *cpu)
+{
+    bit_u3_hl(0, cpu);
+}
+void cpu_op_0xCB47(CPUState *cpu)
+{
+    bit_u3_r8(0, cpu->A, cpu);
+}
+void cpu_op_0xCB48(CPUState *cpu)
+{
+    bit_u3_r8(1, cpu->B, cpu);
+}
+void cpu_op_0xCB49(CPUState *cpu)
+{
+    bit_u3_r8(1, cpu->C, cpu);
+}
+void cpu_op_0xCB4A(CPUState *cpu)
+{
+    bit_u3_r8(1, cpu->D, cpu);
+}
+void cpu_op_0xCB4B(CPUState *cpu)
+{
+    bit_u3_r8(1, cpu->E, cpu);
+}
+void cpu_op_0xCB4C(CPUState *cpu)
+{
+    bit_u3_r8(1, cpu->H, cpu);
+}
+void cpu_op_0xCB4D(CPUState *cpu)
+{
+    bit_u3_r8(1, cpu->L, cpu);
+}
+void cpu_op_0xCB4E(CPUState *cpu)
+{
+    bit_u3_hl(1, cpu);
+}
+void cpu_op_0xCB4F(CPUState *cpu)
+{
+    bit_u3_r8(1, cpu->A, cpu);
+}
+void cpu_op_0xCB50(CPUState *cpu)
+{
+    bit_u3_r8(2, cpu->B, cpu);
+}
+void cpu_op_0xCB51(CPUState *cpu)
+{
+    bit_u3_r8(2, cpu->C, cpu);
+}
+void cpu_op_0xCB52(CPUState *cpu)
+{
+    bit_u3_r8(2, cpu->D, cpu);
+}
+void cpu_op_0xCB53(CPUState *cpu)
+{
+    bit_u3_r8(2, cpu->E, cpu);
+}
+void cpu_op_0xCB54(CPUState *cpu)
+{
+    bit_u3_r8(2, cpu->H, cpu);
+}
+void cpu_op_0xCB55(CPUState *cpu)
+{
+    bit_u3_r8(2, cpu->L, cpu);
+}
+void cpu_op_0xCB56(CPUState *cpu)
+{
+    bit_u3_hl(2, cpu);
+}
+void cpu_op_0xCB57(CPUState *cpu)
+{
+    bit_u3_r8(2, cpu->A, cpu);
+}
+void cpu_op_0xCB58(CPUState *cpu)
+{
+    bit_u3_r8(3, cpu->B, cpu);
+}
+void cpu_op_0xCB59(CPUState *cpu)
+{
+    bit_u3_r8(3, cpu->C, cpu);
+}
+void cpu_op_0xCB5A(CPUState *cpu)
+{
+    bit_u3_r8(3, cpu->D, cpu);
+}
+void cpu_op_0xCB5B(CPUState *cpu)
+{
+    bit_u3_r8(3, cpu->E, cpu);
+}
+void cpu_op_0xCB5C(CPUState *cpu)
+{
+    bit_u3_r8(3, cpu->H, cpu);
+}
+void cpu_op_0xCB5D(CPUState *cpu)
+{
+    bit_u3_r8(3, cpu->L, cpu);
+}
+void cpu_op_0xCB5E(CPUState *cpu)
+{
+    bit_u3_hl(3, cpu);
+}
+void cpu_op_0xCB5F(CPUState *cpu)
+{
+    bit_u3_r8(3, cpu->A, cpu);
+}
+void cpu_op_0xCB60(CPUState *cpu)
+{
+    bit_u3_r8(4, cpu->B, cpu);
+}
+void cpu_op_0xCB61(CPUState *cpu)
+{
+    bit_u3_r8(4, cpu->C, cpu);
+}
+void cpu_op_0xCB62(CPUState *cpu)
+{
+    bit_u3_r8(4, cpu->D, cpu);
+}
+void cpu_op_0xCB63(CPUState *cpu)
+{
+    bit_u3_r8(4, cpu->E, cpu);
+}
+void cpu_op_0xCB64(CPUState *cpu)
+{
+    bit_u3_r8(4, cpu->H, cpu);
+}
+void cpu_op_0xCB65(CPUState *cpu)
+{
+    bit_u3_r8(4, cpu->L, cpu);
+}
+void cpu_op_0xCB66(CPUState *cpu)
+{
+    bit_u3_hl(4, cpu);
+}
+void cpu_op_0xCB67(CPUState *cpu)
+{
+    bit_u3_r8(4, cpu->A, cpu);
+}
+void cpu_op_0xCB68(CPUState *cpu)
+{
+    bit_u3_r8(5, cpu->B, cpu);
+}
+void cpu_op_0xCB69(CPUState *cpu)
+{
+    bit_u3_r8(5, cpu->C, cpu);
+}
+void cpu_op_0xCB6A(CPUState *cpu)
+{
+    bit_u3_r8(5, cpu->D, cpu);
+}
+void cpu_op_0xCB6B(CPUState *cpu)
+{
+    bit_u3_r8(5, cpu->E, cpu);
+}
+void cpu_op_0xCB6C(CPUState *cpu)
+{
+    bit_u3_r8(5, cpu->H, cpu);
+}
+void cpu_op_0xCB6D(CPUState *cpu)
+{
+    bit_u3_r8(5, cpu->L, cpu);
+}
+void cpu_op_0xCB6E(CPUState *cpu)
+{
+    bit_u3_hl(5, cpu);
+}
+void cpu_op_0xCB6F(CPUState *cpu)
+{
+    bit_u3_r8(5, cpu->A, cpu);
+}
+void cpu_op_0xCB70(CPUState *cpu)
+{
+    bit_u3_r8(6, cpu->B, cpu);
+}
+void cpu_op_0xCB71(CPUState *cpu)
+{
+    bit_u3_r8(6, cpu->C, cpu);
+}
+void cpu_op_0xCB72(CPUState *cpu)
+{
+    bit_u3_r8(6, cpu->D, cpu);
+}
+void cpu_op_0xCB73(CPUState *cpu)
+{
+    bit_u3_r8(6, cpu->E, cpu);
+}
+void cpu_op_0xCB74(CPUState *cpu)
+{
+    bit_u3_r8(6, cpu->H, cpu);
+}
+void cpu_op_0xCB75(CPUState *cpu)
+{
+    bit_u3_r8(6, cpu->L, cpu);
+}
+void cpu_op_0xCB76(CPUState *cpu)
+{
+    bit_u3_hl(6, cpu);
+}
+void cpu_op_0xCB77(CPUState *cpu)
+{
+    bit_u3_r8(6, cpu->A, cpu);
+}
+void cpu_op_0xCB78(CPUState *cpu)
+{
+    bit_u3_r8(7, cpu->B, cpu);
+}
+void cpu_op_0xCB79(CPUState *cpu)
+{
+    bit_u3_r8(7, cpu->C, cpu);
+}
+void cpu_op_0xCB7A(CPUState *cpu)
+{
+    bit_u3_r8(7, cpu->D, cpu);
+}
+void cpu_op_0xCB7B(CPUState *cpu)
+{
+    bit_u3_r8(7, cpu->E, cpu);
+}
+void cpu_op_0xCB7C(CPUState *cpu)
+{
+    bit_u3_r8(7, cpu->H, cpu);
+}
+void cpu_op_0xCB7D(CPUState *cpu)
+{
+    bit_u3_r8(7, cpu->L, cpu);
+}
+void cpu_op_0xCB7E(CPUState *cpu)
+{
+    bit_u3_hl(7, cpu);
+}
+void cpu_op_0xCB7F(CPUState *cpu)
+{
+    bit_u3_r8(7, cpu->A, cpu);
+}
+void cpu_op_0xCB80(CPUState *cpu)
+{
+    res_u3_r8(0, &cpu->B, cpu);
+}
+void cpu_op_0xCB81(CPUState *cpu)
+{
+    res_u3_r8(0, &cpu->C, cpu);
+}
+void cpu_op_0xCB82(CPUState *cpu)
+{
+    res_u3_r8(0, &cpu->D, cpu);
+}
+void cpu_op_0xCB83(CPUState *cpu)
+{
+    res_u3_r8(0, &cpu->E, cpu);
+}
+void cpu_op_0xCB84(CPUState *cpu)
+{
+    res_u3_r8(0, &cpu->H, cpu);
+}
+void cpu_op_0xCB85(CPUState *cpu)
+{
+    res_u3_r8(0, &cpu->L, cpu);
+}
+void cpu_op_0xCB86(CPUState *cpu)
+{
+    res_u3_hl(0, cpu);
+}
+void cpu_op_0xCB87(CPUState *cpu)
+{
+    res_u3_r8(0, &cpu->A, cpu);
+}
+void cpu_op_0xCB88(CPUState *cpu)
+{
+    res_u3_r8(1, &cpu->B, cpu);
+}
+void cpu_op_0xCB89(CPUState *cpu)
+{
+    res_u3_r8(1, &cpu->C, cpu);
+}
+void cpu_op_0xCB8A(CPUState *cpu)
+{
+    res_u3_r8(1, &cpu->D, cpu);
+}
+void cpu_op_0xCB8B(CPUState *cpu)
+{
+    res_u3_r8(1, &cpu->E, cpu);
+}
+void cpu_op_0xCB8C(CPUState *cpu)
+{
+    res_u3_r8(1, &cpu->H, cpu);
+}
+void cpu_op_0xCB8D(CPUState *cpu)
+{
+    res_u3_r8(1, &cpu->L, cpu);
+}
+void cpu_op_0xCB8E(CPUState *cpu)
+{
+    res_u3_hl(1, cpu);
+}
+void cpu_op_0xCB8F(CPUState *cpu)
+{
+    res_u3_r8(1, &cpu->A, cpu);
+}
+void cpu_op_0xCB90(CPUState *cpu)
+{
+    res_u3_r8(2, &cpu->B, cpu);
+}
+void cpu_op_0xCB91(CPUState *cpu)
+{
+    res_u3_r8(2, &cpu->C, cpu);
+}
+void cpu_op_0xCB92(CPUState *cpu)
+{
+    res_u3_r8(2, &cpu->D, cpu);
+}
+void cpu_op_0xCB93(CPUState *cpu)
+{
+    res_u3_r8(2, &cpu->E, cpu);
+}
+void cpu_op_0xCB94(CPUState *cpu)
+{
+    res_u3_r8(2, &cpu->H, cpu);
+}
+void cpu_op_0xCB95(CPUState *cpu)
+{
+    res_u3_r8(2, &cpu->L, cpu);
+}
+void cpu_op_0xCB96(CPUState *cpu)
+{
+    res_u3_hl(2, cpu);
+}
+void cpu_op_0xCB97(CPUState *cpu)
+{
+    res_u3_r8(2, &cpu->A, cpu);
+}
+void cpu_op_0xCB98(CPUState *cpu)
+{
+    res_u3_r8(3, &cpu->B, cpu);
+}
+void cpu_op_0xCB99(CPUState *cpu)
+{
+    res_u3_r8(3, &cpu->C, cpu);
+}
+void cpu_op_0xCB9A(CPUState *cpu)
+{
+    res_u3_r8(3, &cpu->D, cpu);
+}
+void cpu_op_0xCB9B(CPUState *cpu)
+{
+    res_u3_r8(3, &cpu->E, cpu);
+}
+void cpu_op_0xCB9C(CPUState *cpu)
+{
+    res_u3_r8(3, &cpu->H, cpu);
+}
+void cpu_op_0xCB9D(CPUState *cpu)
+{
+    res_u3_r8(3, &cpu->L, cpu);
+}
+void cpu_op_0xCB9E(CPUState *cpu)
+{
+    res_u3_hl(3, cpu);
+}
+void cpu_op_0xCB9F(CPUState *cpu)
+{
+    res_u3_r8(3, &cpu->A, cpu);
+}
+void cpu_op_0xCBA0(CPUState *cpu)
+{
+    res_u3_r8(4, &cpu->B, cpu);
+}
+void cpu_op_0xCBA1(CPUState *cpu)
+{
+    res_u3_r8(4, &cpu->C, cpu);
+}
+void cpu_op_0xCBA2(CPUState *cpu)
+{
+    res_u3_r8(4, &cpu->D, cpu);
+}
+void cpu_op_0xCBA3(CPUState *cpu)
+{
+    res_u3_r8(4, &cpu->E, cpu);
+}
+void cpu_op_0xCBA4(CPUState *cpu)
+{
+    res_u3_r8(4, &cpu->H, cpu);
+}
+void cpu_op_0xCBA5(CPUState *cpu)
+{
+    res_u3_r8(4, &cpu->L, cpu);
+}
+void cpu_op_0xCBA6(CPUState *cpu)
+{
+    res_u3_hl(4, cpu);
+}
+void cpu_op_0xCBA7(CPUState *cpu)
+{
+    res_u3_r8(4, &cpu->A, cpu);
+}
+void cpu_op_0xCBA8(CPUState *cpu)
+{
+    res_u3_r8(5, &cpu->B, cpu);
+}
+void cpu_op_0xCBA9(CPUState *cpu)
+{
+    res_u3_r8(5, &cpu->C, cpu);
+}
+void cpu_op_0xCBAA(CPUState *cpu)
+{
+    res_u3_r8(5, &cpu->D, cpu);
+}
+void cpu_op_0xCBAB(CPUState *cpu)
+{
+    res_u3_r8(5, &cpu->E, cpu);
+}
+void cpu_op_0xCBAC(CPUState *cpu)
+{
+    res_u3_r8(5, &cpu->H, cpu);
+}
+void cpu_op_0xCBAD(CPUState *cpu)
+{
+    res_u3_r8(5, &cpu->L, cpu);
+}
+void cpu_op_0xCBAE(CPUState *cpu)
+{
+    res_u3_hl(5, cpu);
+}
+void cpu_op_0xCBAF(CPUState *cpu)
+{
+    res_u3_r8(5, &cpu->A, cpu);
+}
+void cpu_op_0xCBB0(CPUState *cpu)
+{
+    res_u3_r8(6, &cpu->B, cpu);
+}
+void cpu_op_0xCBB1(CPUState *cpu)
+{
+    res_u3_r8(6, &cpu->C, cpu);
+}
+void cpu_op_0xCBB2(CPUState *cpu)
+{
+    res_u3_r8(6, &cpu->D, cpu);
+}
+void cpu_op_0xCBB3(CPUState *cpu)
+{
+    res_u3_r8(6, &cpu->E, cpu);
+}
+void cpu_op_0xCBB4(CPUState *cpu)
+{
+    res_u3_r8(6, &cpu->H, cpu);
+}
+void cpu_op_0xCBB5(CPUState *cpu)
+{
+    res_u3_r8(6, &cpu->L, cpu);
+}
+void cpu_op_0xCBB6(CPUState *cpu)
+{
+    res_u3_hl(6, cpu);
+}
+void cpu_op_0xCBB7(CPUState *cpu)
+{
+    res_u3_r8(6, &cpu->A, cpu);
+}
+void cpu_op_0xCBB8(CPUState *cpu)
+{
+    res_u3_r8(7, &cpu->B, cpu);
+}
+void cpu_op_0xCBB9(CPUState *cpu)
+{
+    res_u3_r8(7, &cpu->C, cpu);
+}
+void cpu_op_0xCBBA(CPUState *cpu)
+{
+    res_u3_r8(7, &cpu->D, cpu);
+}
+void cpu_op_0xCBBB(CPUState *cpu)
+{
+    res_u3_r8(7, &cpu->E, cpu);
+}
+void cpu_op_0xCBBC(CPUState *cpu)
+{
+    res_u3_r8(7, &cpu->H, cpu);
+}
+void cpu_op_0xCBBD(CPUState *cpu)
+{
+    res_u3_r8(7, &cpu->L, cpu);
+}
+void cpu_op_0xCBBE(CPUState *cpu)
+{
+    res_u3_hl(7, cpu);
+}
+void cpu_op_0xCBBF(CPUState *cpu)
+{
+    res_u3_r8(7, &cpu->A, cpu);
+}
+void cpu_op_0xCBC0(CPUState *cpu)
+{
+    set_u3_r8(0, &cpu->B, cpu);
+}
+void cpu_op_0xCBC1(CPUState *cpu)
+{
+    set_u3_r8(0, &cpu->C, cpu);
+}
+void cpu_op_0xCBC2(CPUState *cpu)
+{
+    set_u3_r8(0, &cpu->D, cpu);
+}
+void cpu_op_0xCBC3(CPUState *cpu)
+{
+    set_u3_r8(0, &cpu->E, cpu);
+}
+void cpu_op_0xCBC4(CPUState *cpu)
+{
+    set_u3_r8(0, &cpu->H, cpu);
+}
+void cpu_op_0xCBC5(CPUState *cpu)
+{
+    set_u3_r8(0, &cpu->L, cpu);
+}
+void cpu_op_0xCBC6(CPUState *cpu)
+{
+    set_u3_hl(0, cpu);
+}
+void cpu_op_0xCBC7(CPUState *cpu)
+{
+    set_u3_r8(0, &cpu->A, cpu);
+}
+void cpu_op_0xCBC8(CPUState *cpu)
+{
+    set_u3_r8(1, &cpu->B, cpu);
+}
+void cpu_op_0xCBC9(CPUState *cpu)
+{
+    set_u3_r8(1, &cpu->C, cpu);
+}
+void cpu_op_0xCBCA(CPUState *cpu)
+{
+    set_u3_r8(1, &cpu->D, cpu);
+}
+void cpu_op_0xCBCB(CPUState *cpu)
+{
+    set_u3_r8(1, &cpu->E, cpu);
+}
+void cpu_op_0xCBCC(CPUState *cpu)
+{
+    set_u3_r8(1, &cpu->H, cpu);
+}
+void cpu_op_0xCBCD(CPUState *cpu)
+{
+    set_u3_r8(1, &cpu->L, cpu);
+}
+void cpu_op_0xCBCE(CPUState *cpu)
+{
+    set_u3_hl(1, cpu);
+}
+void cpu_op_0xCBCF(CPUState *cpu)
+{
+    set_u3_r8(1, &cpu->A, cpu);
+}
+void cpu_op_0xCBD0(CPUState *cpu)
+{
+    set_u3_r8(2, &cpu->B, cpu);
+}
+void cpu_op_0xCBD1(CPUState *cpu)
+{
+    set_u3_r8(2, &cpu->C, cpu);
+}
+void cpu_op_0xCBD2(CPUState *cpu)
+{
+    set_u3_r8(2, &cpu->D, cpu);
+}
+void cpu_op_0xCBD3(CPUState *cpu)
+{
+    set_u3_r8(2, &cpu->E, cpu);
+}
+void cpu_op_0xCBD4(CPUState *cpu)
+{
+    set_u3_r8(2, &cpu->H, cpu);
+}
+void cpu_op_0xCBD5(CPUState *cpu)
+{
+    set_u3_r8(2, &cpu->L, cpu);
+}
+void cpu_op_0xCBD6(CPUState *cpu)
+{
+    set_u3_hl(2, cpu);
+}
+void cpu_op_0xCBD7(CPUState *cpu)
+{
+    set_u3_r8(2, &cpu->A, cpu);
+}
+void cpu_op_0xCBD8(CPUState *cpu)
+{
+    set_u3_r8(3, &cpu->B, cpu);
+}
+void cpu_op_0xCBD9(CPUState *cpu)
+{
+    set_u3_r8(3, &cpu->C, cpu);
+}
+void cpu_op_0xCBDA(CPUState *cpu)
+{
+    set_u3_r8(3, &cpu->D, cpu);
+}
+void cpu_op_0xCBDB(CPUState *cpu)
+{
+    set_u3_r8(3, &cpu->E, cpu);
+}
+void cpu_op_0xCBDC(CPUState *cpu)
+{
+    set_u3_r8(3, &cpu->H, cpu);
+}
+void cpu_op_0xCBDD(CPUState *cpu)
+{
+    set_u3_r8(3, &cpu->L, cpu);
+}
+void cpu_op_0xCBDE(CPUState *cpu)
+{
+    set_u3_hl(3, cpu);
+}
+void cpu_op_0xCBDF(CPUState *cpu)
+{
+    set_u3_r8(3, &cpu->A, cpu);
+}
+void cpu_op_0xCBE0(CPUState *cpu)
+{
+    set_u3_r8(4, &cpu->B, cpu);
+}
+void cpu_op_0xCBE1(CPUState *cpu)
+{
+    set_u3_r8(4, &cpu->C, cpu);
+}
+void cpu_op_0xCBE2(CPUState *cpu)
+{
+    set_u3_r8(4, &cpu->D, cpu);
+}
+void cpu_op_0xCBE3(CPUState *cpu)
+{
+    set_u3_r8(4, &cpu->E, cpu);
+}
+void cpu_op_0xCBE4(CPUState *cpu)
+{
+    set_u3_r8(4, &cpu->H, cpu);
+}
+void cpu_op_0xCBE5(CPUState *cpu)
+{
+    set_u3_r8(4, &cpu->L, cpu);
+}
+void cpu_op_0xCBE6(CPUState *cpu)
+{
+    set_u3_hl(4, cpu);
+}
+void cpu_op_0xCBE7(CPUState *cpu)
+{
+    set_u3_r8(4, &cpu->A, cpu);
+}
+void cpu_op_0xCBE8(CPUState *cpu)
+{
+    set_u3_r8(5, &cpu->B, cpu);
+}
+void cpu_op_0xCBE9(CPUState *cpu)
+{
+    set_u3_r8(5, &cpu->C, cpu);
+}
+void cpu_op_0xCBEA(CPUState *cpu)
+{
+    set_u3_r8(5, &cpu->D, cpu);
+}
+void cpu_op_0xCBEB(CPUState *cpu)
+{
+    set_u3_r8(5, &cpu->E, cpu);
+}
+void cpu_op_0xCBEC(CPUState *cpu)
+{
+    set_u3_r8(5, &cpu->H, cpu);
+}
+void cpu_op_0xCBED(CPUState *cpu)
+{
+    set_u3_r8(5, &cpu->L, cpu);
+}
+void cpu_op_0xCBEE(CPUState *cpu)
+{
+    set_u3_hl(5, cpu);
+}
+void cpu_op_0xCBEF(CPUState *cpu)
+{
+    set_u3_r8(5, &cpu->A, cpu);
+}
+void cpu_op_0xCBF0(CPUState *cpu)
+{
+    set_u3_r8(6, &cpu->B, cpu);
+}
+void cpu_op_0xCBF1(CPUState *cpu)
+{
+    set_u3_r8(6, &cpu->C, cpu);
+}
+void cpu_op_0xCBF2(CPUState *cpu)
+{
+    set_u3_r8(6, &cpu->D, cpu);
+}
+void cpu_op_0xCBF3(CPUState *cpu)
+{
+    set_u3_r8(6, &cpu->E, cpu);
+}
+void cpu_op_0xCBF4(CPUState *cpu)
+{
+    set_u3_r8(6, &cpu->H, cpu);
+}
+void cpu_op_0xCBF5(CPUState *cpu)
+{
+    set_u3_r8(6, &cpu->L, cpu);
+}
+void cpu_op_0xCBF6(CPUState *cpu)
+{
+    set_u3_hl(6, cpu);
+}
+void cpu_op_0xCBF7(CPUState *cpu)
+{
+    set_u3_r8(6, &cpu->A, cpu);
+}
+void cpu_op_0xCBF8(CPUState *cpu)
+{
+    set_u3_r8(7, &cpu->B, cpu);
+}
+void cpu_op_0xCBF9(CPUState *cpu)
+{
+    set_u3_r8(7, &cpu->C, cpu);
+}
+void cpu_op_0xCBFA(CPUState *cpu)
+{
+    set_u3_r8(7, &cpu->D, cpu);
+}
+void cpu_op_0xCBFB(CPUState *cpu)
+{
+    set_u3_r8(7, &cpu->E, cpu);
+}
+void cpu_op_0xCBFC(CPUState *cpu)
+{
+    set_u3_r8(7, &cpu->H, cpu);
+}
+void cpu_op_0xCBFD(CPUState *cpu)
+{
+    set_u3_r8(7, &cpu->L, cpu);
+}
+void cpu_op_0xCBFE(CPUState *cpu)
+{
+    set_u3_hl(7, cpu);
+}
+void cpu_op_0xCBFF(CPUState *cpu)
+{
+    set_u3_r8(7, &cpu->A, cpu);
 }
 
 const void (*opcodes[])(CPUState *) = {
@@ -1524,4 +2332,263 @@ const void (*opcodes[])(CPUState *) = {
     cpu_op_0xFD,
     cpu_op_0xFE,
     cpu_op_0xFF,
+};
+
+const void (*extended_opcodes[])(CPUState *) = {
+    cpu_op_0xCB00,
+    cpu_op_0xCB01,
+    cpu_op_0xCB02,
+    cpu_op_0xCB03,
+    cpu_op_0xCB04,
+    cpu_op_0xCB05,
+    cpu_op_0xCB06,
+    cpu_op_0xCB07,
+    cpu_op_0xCB08,
+    cpu_op_0xCB09,
+    cpu_op_0xCB0A,
+    cpu_op_0xCB0B,
+    cpu_op_0xCB0C,
+    cpu_op_0xCB0D,
+    cpu_op_0xCB0E,
+    cpu_op_0xCB0F,
+    cpu_op_0xCB10,
+    cpu_op_0xCB11,
+    cpu_op_0xCB12,
+    cpu_op_0xCB13,
+    cpu_op_0xCB14,
+    cpu_op_0xCB15,
+    cpu_op_0xCB16,
+    cpu_op_0xCB17,
+    cpu_op_0xCB18,
+    cpu_op_0xCB19,
+    cpu_op_0xCB1A,
+    cpu_op_0xCB1B,
+    cpu_op_0xCB1C,
+    cpu_op_0xCB1D,
+    cpu_op_0xCB1E,
+    cpu_op_0xCB1F,
+    cpu_op_0xCB20,
+    cpu_op_0xCB21,
+    cpu_op_0xCB22,
+    cpu_op_0xCB23,
+    cpu_op_0xCB24,
+    cpu_op_0xCB25,
+    cpu_op_0xCB26,
+    cpu_op_0xCB27,
+    cpu_op_0xCB28,
+    cpu_op_0xCB29,
+    cpu_op_0xCB2A,
+    cpu_op_0xCB2B,
+    cpu_op_0xCB2C,
+    cpu_op_0xCB2D,
+    cpu_op_0xCB2E,
+    cpu_op_0xCB2F,
+    cpu_op_0xCB30,
+    cpu_op_0xCB31,
+    cpu_op_0xCB32,
+    cpu_op_0xCB33,
+    cpu_op_0xCB34,
+    cpu_op_0xCB35,
+    cpu_op_0xCB36,
+    cpu_op_0xCB37,
+    cpu_op_0xCB38,
+    cpu_op_0xCB39,
+    cpu_op_0xCB3A,
+    cpu_op_0xCB3B,
+    cpu_op_0xCB3C,
+    cpu_op_0xCB3D,
+    cpu_op_0xCB3E,
+    cpu_op_0xCB3F,
+    cpu_op_0xCB40,
+    cpu_op_0xCB41,
+    cpu_op_0xCB42,
+    cpu_op_0xCB43,
+    cpu_op_0xCB44,
+    cpu_op_0xCB45,
+    cpu_op_0xCB46,
+    cpu_op_0xCB47,
+    cpu_op_0xCB48,
+    cpu_op_0xCB49,
+    cpu_op_0xCB4A,
+    cpu_op_0xCB4B,
+    cpu_op_0xCB4C,
+    cpu_op_0xCB4D,
+    cpu_op_0xCB4E,
+    cpu_op_0xCB4F,
+    cpu_op_0xCB50,
+    cpu_op_0xCB51,
+    cpu_op_0xCB52,
+    cpu_op_0xCB53,
+    cpu_op_0xCB54,
+    cpu_op_0xCB55,
+    cpu_op_0xCB56,
+    cpu_op_0xCB57,
+    cpu_op_0xCB58,
+    cpu_op_0xCB59,
+    cpu_op_0xCB5A,
+    cpu_op_0xCB5B,
+    cpu_op_0xCB5C,
+    cpu_op_0xCB5D,
+    cpu_op_0xCB5E,
+    cpu_op_0xCB5F,
+    cpu_op_0xCB60,
+    cpu_op_0xCB61,
+    cpu_op_0xCB62,
+    cpu_op_0xCB63,
+    cpu_op_0xCB64,
+    cpu_op_0xCB65,
+    cpu_op_0xCB66,
+    cpu_op_0xCB67,
+    cpu_op_0xCB68,
+    cpu_op_0xCB69,
+    cpu_op_0xCB6A,
+    cpu_op_0xCB6B,
+    cpu_op_0xCB6C,
+    cpu_op_0xCB6D,
+    cpu_op_0xCB6E,
+    cpu_op_0xCB6F,
+    cpu_op_0xCB70,
+    cpu_op_0xCB71,
+    cpu_op_0xCB72,
+    cpu_op_0xCB73,
+    cpu_op_0xCB74,
+    cpu_op_0xCB75,
+    cpu_op_0xCB76,
+    cpu_op_0xCB77,
+    cpu_op_0xCB78,
+    cpu_op_0xCB79,
+    cpu_op_0xCB7A,
+    cpu_op_0xCB7B,
+    cpu_op_0xCB7C,
+    cpu_op_0xCB7D,
+    cpu_op_0xCB7E,
+    cpu_op_0xCB7F,
+    cpu_op_0xCB80,
+    cpu_op_0xCB81,
+    cpu_op_0xCB82,
+    cpu_op_0xCB83,
+    cpu_op_0xCB84,
+    cpu_op_0xCB85,
+    cpu_op_0xCB86,
+    cpu_op_0xCB87,
+    cpu_op_0xCB88,
+    cpu_op_0xCB89,
+    cpu_op_0xCB8A,
+    cpu_op_0xCB8B,
+    cpu_op_0xCB8C,
+    cpu_op_0xCB8D,
+    cpu_op_0xCB8E,
+    cpu_op_0xCB8F,
+    cpu_op_0xCB90,
+    cpu_op_0xCB91,
+    cpu_op_0xCB92,
+    cpu_op_0xCB93,
+    cpu_op_0xCB94,
+    cpu_op_0xCB95,
+    cpu_op_0xCB96,
+    cpu_op_0xCB97,
+    cpu_op_0xCB98,
+    cpu_op_0xCB99,
+    cpu_op_0xCB9A,
+    cpu_op_0xCB9B,
+    cpu_op_0xCB9C,
+    cpu_op_0xCB9D,
+    cpu_op_0xCB9E,
+    cpu_op_0xCB9F,
+    cpu_op_0xCBA0,
+    cpu_op_0xCBA1,
+    cpu_op_0xCBA2,
+    cpu_op_0xCBA3,
+    cpu_op_0xCBA4,
+    cpu_op_0xCBA5,
+    cpu_op_0xCBA6,
+    cpu_op_0xCBA7,
+    cpu_op_0xCBA8,
+    cpu_op_0xCBA9,
+    cpu_op_0xCBAA,
+    cpu_op_0xCBAB,
+    cpu_op_0xCBAC,
+    cpu_op_0xCBAD,
+    cpu_op_0xCBAE,
+    cpu_op_0xCBAF,
+    cpu_op_0xCBB0,
+    cpu_op_0xCBB1,
+    cpu_op_0xCBB2,
+    cpu_op_0xCBB3,
+    cpu_op_0xCBB4,
+    cpu_op_0xCBB5,
+    cpu_op_0xCBB6,
+    cpu_op_0xCBB7,
+    cpu_op_0xCBB8,
+    cpu_op_0xCBB9,
+    cpu_op_0xCBBA,
+    cpu_op_0xCBBB,
+    cpu_op_0xCBBC,
+    cpu_op_0xCBBD,
+    cpu_op_0xCBBE,
+    cpu_op_0xCBBF,
+    cpu_op_0xCBC0,
+    cpu_op_0xCBC1,
+    cpu_op_0xCBC2,
+    cpu_op_0xCBC3,
+    cpu_op_0xCBC4,
+    cpu_op_0xCBC5,
+    cpu_op_0xCBC6,
+    cpu_op_0xCBC7,
+    cpu_op_0xCBC8,
+    cpu_op_0xCBC9,
+    cpu_op_0xCBCA,
+    cpu_op_0xCBCB,
+    cpu_op_0xCBCC,
+    cpu_op_0xCBCD,
+    cpu_op_0xCBCE,
+    cpu_op_0xCBCF,
+    cpu_op_0xCBD0,
+    cpu_op_0xCBD1,
+    cpu_op_0xCBD2,
+    cpu_op_0xCBD3,
+    cpu_op_0xCBD4,
+    cpu_op_0xCBD5,
+    cpu_op_0xCBD6,
+    cpu_op_0xCBD7,
+    cpu_op_0xCBD8,
+    cpu_op_0xCBD9,
+    cpu_op_0xCBDA,
+    cpu_op_0xCBDB,
+    cpu_op_0xCBDC,
+    cpu_op_0xCBDD,
+    cpu_op_0xCBDE,
+    cpu_op_0xCBDF,
+    cpu_op_0xCBE0,
+    cpu_op_0xCBE1,
+    cpu_op_0xCBE2,
+    cpu_op_0xCBE3,
+    cpu_op_0xCBE4,
+    cpu_op_0xCBE5,
+    cpu_op_0xCBE6,
+    cpu_op_0xCBE7,
+    cpu_op_0xCBE8,
+    cpu_op_0xCBE9,
+    cpu_op_0xCBEA,
+    cpu_op_0xCBEB,
+    cpu_op_0xCBEC,
+    cpu_op_0xCBED,
+    cpu_op_0xCBEE,
+    cpu_op_0xCBEF,
+    cpu_op_0xCBF0,
+    cpu_op_0xCBF1,
+    cpu_op_0xCBF2,
+    cpu_op_0xCBF3,
+    cpu_op_0xCBF4,
+    cpu_op_0xCBF5,
+    cpu_op_0xCBF6,
+    cpu_op_0xCBF7,
+    cpu_op_0xCBF8,
+    cpu_op_0xCBF9,
+    cpu_op_0xCBFA,
+    cpu_op_0xCBFB,
+    cpu_op_0xCBFC,
+    cpu_op_0xCBFD,
+    cpu_op_0xCBFE,
+    cpu_op_0xCBFF,
 };

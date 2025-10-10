@@ -2,6 +2,7 @@
 #define CPU
 #include "CPU_Defs.h"
 #include "CPU_OP_Codes.h"
+#include <ctype.h>
 #include <stdint.h>
 #include <stdio.h>
 
@@ -14,6 +15,6 @@ Thanks to :
 
 void cpu_reset(CPUState *cpu);
 
-void cpu_execute_instruction(CPUState *cpu);
+uint32_t cpu_execute_instruction(CPUState *cpu);
 
 #endif
