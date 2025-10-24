@@ -23,7 +23,7 @@ enum
     FLAG_C = 1 << 4,
 };
 
-typedef struct
+typedef struct CPUState
 {
     union
     {
@@ -94,6 +94,11 @@ typedef struct
     bool stop : 1;               // CPU is stopped
     MemoryState *memory;         // Pointer to the memory state structure
     uint64_t cycle_count;        // Cycle count for performance tracking
+    bool halt_bug;               // HALT bug active (next fetch without PC increment)
+    uint16_t div_counter;        // Internal divider counter
+    bool timer_prev_signal;      // Previous timer signal state (for falling edge detection)
+    bool timer_reload_active;    // TIMA reload in progress (after overflow)
+    uint8_t timer_reload_delay;  // Cycles remaining before reload completes
 } CPUState;
 
 static inline void setZ(CPUState *c, bool v)

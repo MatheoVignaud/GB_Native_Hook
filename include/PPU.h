@@ -25,9 +25,6 @@
 #define STAT_MODE_2 0x02
 #define STAT_MODE_3 0x03
 
-#define IF_VBLANK 0x01
-#define IF_LCDSTAT 0x02
-
 typedef struct
 {
     Memory *mem;
@@ -36,6 +33,16 @@ typedef struct
     uint32_t fb[GB_SCREEN_WIDTH * GB_SCREEN_HEIGHT];
 
     uint8_t last_mode;
+    bool lcd_enabled;
+    bool lyc_match;
+    uint8_t sprite_count;
+    struct
+    {
+        uint8_t x;
+        uint8_t tile;
+        uint8_t attributes;
+        uint8_t line;
+    } scanline_sprites[10];
 } PPUState;
 
 void ppu_reset(PPUState *ppu);

@@ -976,6 +976,8 @@ static inline void reti(CPUState *cpu)
 {
     ret(cpu);
     cpu->IME = true;
+    cpu->IME_enable_pending = false;
+    cpu->EI_pending = false;
 }
 
 static inline void rst(uint8_t index, CPUState *cpu)
@@ -994,6 +996,8 @@ static inline void rst(uint8_t index, CPUState *cpu)
 static inline void di(CPUState *cpu)
 {
     cpu->IME = false;
+    cpu->IME_enable_pending = false;
+    cpu->EI_pending = false;
     cpu->cycle_count += 1;
 }
 
@@ -1005,7 +1009,15 @@ static inline void ei(CPUState *cpu)
 
 static inline void halt(CPUState *cpu)
 {
-    cpu->halt = true;
+    uint8_t pending = cpu->memory->memory.IE & cpu->memory->memory.IF & 0x1F;
+    if (!cpu->IME && pending)
+    {
+        cpu->halt_bug = true;
+    }
+    else
+    {
+        cpu->halt = true;
+    }
     cpu->cycle_count += 1;
 }
 
@@ -1092,6 +1104,13 @@ static inline void nop(CPUState *cpu)
 static inline void stop(CPUState *cpu)
 {
     cpu->stop = true;
+    cpu->halt = false;
+    cpu->halt_bug = false;
+    cpu->div_counter = 0;
+    cpu->timer_prev_signal = false;
+    cpu->timer_reload_active = false;
+    cpu->timer_reload_delay = 0;
+    cpu->memory->memory.DIV = 0;
     cpu->cycle_count += 1;
 }
 

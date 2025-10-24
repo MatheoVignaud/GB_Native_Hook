@@ -8,6 +8,26 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#define IF_VBLANK 0x01
+#define IF_LCDSTAT 0x02
+#define IF_TIMER 0x04
+#define IF_SERIAL 0x08
+#define IF_JOYPAD 0x10
+
+typedef enum
+{
+    JOYPAD_RIGHT = 0,
+    JOYPAD_LEFT = 1,
+    JOYPAD_UP = 2,
+    JOYPAD_DOWN = 3,
+    JOYPAD_A = 4,
+    JOYPAD_B = 5,
+    JOYPAD_SELECT = 6,
+    JOYPAD_START = 7
+} JoypadInput;
+
+struct CPUState;
+
 #if defined(_MSC_VER)
 #pragma pack(push, 1)
 #else
@@ -153,10 +173,18 @@ typedef struct
     Memory memory;
     uint8_t bios[0x100]; // BIOS ROM (256 bytes)
     bool bios_enabled;
+    struct CPUState *cpu; // Back-reference for side effects (timers, etc.)
+    uint8_t joypad_buttons; // Lower nibble, 1 = released
+    uint8_t joypad_dpad;    // Lower nibble, 1 = released
+    uint8_t joypad_select;  // Bits 4/5 selection latch
 } MemoryState;
 
 int load_rom(const char *path, uint8_t *mem);
 int load_bios(const char *path, uint8_t *bios);
+
+void memory_init(MemoryState *mem);
+
+void memory_set_button_state(MemoryState *mem, JoypadInput input, bool pressed);
 
 uint8_t memory_read(MemoryState *mem, uint16_t address);
 void memory_write(MemoryState *mem, uint16_t address, uint8_t value);

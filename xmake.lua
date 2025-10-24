@@ -7,6 +7,7 @@ target("GB_Native_Hook")
     add_files("src/*.c")
     add_includedirs("include")
     add_packages("libsdl3")
-    add_links("ws2_32")
-
+    if is_plat("windows") then
+        add_links("ws2_32")
+    end
 
