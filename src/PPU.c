@@ -190,6 +190,17 @@ static void ppu_set_mode(PPUState *ppu, uint8_t mode)
             }
             break;
         case STAT_MODE_1:
+        {
+            static uint64_t vblank_counter = 0;
+            vblank_counter++;
+            if (vblank_counter <= 3 || (vblank_counter % 100 == 0))
+            {
+                printf("[PPU] Enter VBlank #%llu: LY=%02X IF(before)=%02X LCDC=%02X\n",
+                       (unsigned long long)vblank_counter,
+                       ppu->mem->LY,
+                       ppu->mem->IF,
+                       ppu->mem->LCDC);
+            }
             if (prev_mode != STAT_MODE_1)
             {
                 ppu->mem->IF |= IF_VBLANK;
@@ -199,6 +210,7 @@ static void ppu_set_mode(PPUState *ppu, uint8_t mode)
                 ppu->mem->IF |= IF_LCDSTAT;
             }
             break;
+        }
         case STAT_MODE_2:
             if (stat & (1 << 5))
             {

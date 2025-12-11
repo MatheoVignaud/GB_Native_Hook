@@ -89,6 +89,17 @@ static uint32_t cpu_service_interrupts(CPUState *cpu)
     if (pending == 0)
         return 0;
 
+    static int interrupt_log_count = 0;
+    if (interrupt_log_count < 5)
+    {
+        printf("[CPU] Pending interrupts: %02X IE=%02X IF=%02X PC=%04X\n",
+               pending,
+               cpu->memory->memory.IE,
+               cpu->memory->memory.IF,
+               cpu->PC);
+        interrupt_log_count++;
+    }
+
     static const uint16_t vectors[5] = {0x40, 0x48, 0x50, 0x58, 0x60};
 
     cpu->halt = false;
@@ -158,7 +169,7 @@ void cpu_reset(CPUState *cpu)
 
 uint64_t instruction_count = 0;
 
-uint16_t breakpoints[] = {};
+uint16_t breakpoints[] = {0x0040, 0x017E, 0x0205, 0x02ED};
 
 uint32_t cpu_execute_instruction(CPUState *cpu)
 {
