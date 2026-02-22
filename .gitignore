@@ -3,3 +3,13 @@
 /build
 dmg_rom.bin
 tetris.gb
+/Pokemon
+/tetris
+/Zelda
+/PokemonSilver
+/generated
+*.gb
+*.sav
+*.dmg
+*.bin
+*.gbc

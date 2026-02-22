@@ -1,4 +1,46 @@
 #include "CPU_OP_Codes.h"
+#include "RecompProbe.h"
+
+#include <stdlib.h>
+
+static int g_cpu_illegal_opcode_softfail = -1;
+
+static int cpu_illegal_opcode_softfail_enabled(void)
+{
+    if (g_cpu_illegal_opcode_softfail >= 0)
+        return g_cpu_illegal_opcode_softfail;
+
+    const char *env = getenv("GB_ILLEGAL_OPCODE_NOP");
+    if (env && env[0] != '\0' && env[0] != '0')
+        g_cpu_illegal_opcode_softfail = 1;
+    else
+        g_cpu_illegal_opcode_softfail = 0;
+    return g_cpu_illegal_opcode_softfail;
+}
+
+void cpu_set_illegal_opcode_softfail(int enabled)
+{
+    g_cpu_illegal_opcode_softfail = (enabled != 0) ? 1 : 0;
+}
+
+void cpu_illegal_opcode(CPUState *cpu, uint8_t opcode)
+{
+    uint16_t op_pc = cpu ? (uint16_t)(cpu->PC - 1u) : 0u;
+
+    if (cpu && op_pc >= 0x8000u)
+        recomp_probe_dyn_dump_code(cpu, op_pc, "ILLEGAL_OPCODE");
+
+    fprintf(stderr, "Opcode 0x%02X invalid/unimplemented at PC: 0x%04X\n", opcode, op_pc);
+
+    if (cpu && cpu_illegal_opcode_softfail_enabled())
+    {
+        fprintf(stderr, "[CPU] softfail illegal opcode -> NOP (GB_ILLEGAL_OPCODE_NOP / recompiled fallback)\n");
+        nop(cpu);
+        return;
+    }
+
+    abort();
+}
 
 void cpu_op_0x00(CPUState *cpu)
 {
@@ -848,9 +890,7 @@ void cpu_op_0xD2(CPUState *cpu)
 }
 void cpu_op_0xD3(CPUState *cpu)
 {
-    printf("Opcode 0xD3 not implemented yet.\n"); // TODO: implementation de l'opcode 0xD3
-    printf("PC: 0x%04X", cpu->PC);
-    abort();
+    cpu_illegal_opcode(cpu, 0xD3);
 }
 void cpu_op_0xD4(CPUState *cpu)
 {
@@ -882,9 +922,7 @@ void cpu_op_0xDA(CPUState *cpu)
 }
 void cpu_op_0xDB(CPUState *cpu)
 {
-    printf("Opcode 0xDB not implemented yet.\n"); // TODO: implementation de l'opcode 0xDB
-    printf("PC: 0x%04X", cpu->PC);
-    abort();
+    cpu_illegal_opcode(cpu, 0xDB);
 }
 void cpu_op_0xDC(CPUState *cpu)
 {
@@ -892,9 +930,7 @@ void cpu_op_0xDC(CPUState *cpu)
 }
 void cpu_op_0xDD(CPUState *cpu)
 {
-    printf("Opcode 0xDD not implemented yet.\n"); // TODO: implementation de l'opcode 0xDD
-    printf("PC: 0x%04X", cpu->PC);
-    abort();
+    cpu_illegal_opcode(cpu, 0xDD);
 }
 void cpu_op_0xDE(CPUState *cpu)
 {
@@ -918,15 +954,11 @@ void cpu_op_0xE2(CPUState *cpu)
 }
 void cpu_op_0xE3(CPUState *cpu)
 {
-    printf("Opcode 0xE3 not implemented yet.\n"); // TODO: implementation de l'opcode 0xE3
-    printf("PC: 0x%04X", cpu->PC);
-    abort();
+    cpu_illegal_opcode(cpu, 0xE3);
 }
 void cpu_op_0xE4(CPUState *cpu)
 {
-    printf("Opcode 0xE4 not implemented yet.\n"); // TODO: implementation de l'opcode 0xE4
-    printf("PC: 0x%04X", cpu->PC);
-    abort();
+    cpu_illegal_opcode(cpu, 0xE4);
 }
 void cpu_op_0xE5(CPUState *cpu)
 {
@@ -955,21 +987,15 @@ void cpu_op_0xEA(CPUState *cpu)
 }
 void cpu_op_0xEB(CPUState *cpu)
 {
-    printf("Opcode 0xEB not implemented yet.\n"); // TODO: implementation de l'opcode 0xEB
-    printf("PC: 0x%04X", cpu->PC);
-    abort();
+    cpu_illegal_opcode(cpu, 0xEB);
 }
 void cpu_op_0xEC(CPUState *cpu)
 {
-    printf("Opcode 0xEC not implemented yet.\n"); // TODO: implementation de l'opcode 0xEC
-    printf("PC: 0x%04X", cpu->PC);
-    abort();
+    cpu_illegal_opcode(cpu, 0xEC);
 }
 void cpu_op_0xED(CPUState *cpu)
 {
-    printf("Opcode 0xED not implemented yet.\n"); // TODO: implementation de l'opcode 0xED
-    printf("PC: 0x%04X", cpu->PC);
-    abort();
+    cpu_illegal_opcode(cpu, 0xED);
 }
 void cpu_op_0xEE(CPUState *cpu)
 {
@@ -997,9 +1023,7 @@ void cpu_op_0xF3(CPUState *cpu)
 }
 void cpu_op_0xF4(CPUState *cpu)
 {
-    printf("Opcode 0xF4 not implemented yet.\n"); // TODO: implementation de l'opcode 0xF4
-    printf("PC: 0x%04X", cpu->PC);
-    abort();
+    cpu_illegal_opcode(cpu, 0xF4);
 }
 void cpu_op_0xF5(CPUState *cpu)
 {
@@ -1031,15 +1055,11 @@ void cpu_op_0xFB(CPUState *cpu)
 }
 void cpu_op_0xFC(CPUState *cpu)
 {
-    printf("Opcode 0xFC not implemented yet.\n"); // TODO: implementation de l'opcode 0xFC
-    printf("PC: 0x%04X", cpu->PC);
-    abort();
+    cpu_illegal_opcode(cpu, 0xFC);
 }
 void cpu_op_0xFD(CPUState *cpu)
 {
-    printf("Opcode 0xFD not implemented yet.\n"); // TODO: implementation de l'opcode 0xFD
-    printf("PC: 0x%04X", cpu->PC);
-    abort();
+    cpu_illegal_opcode(cpu, 0xFD);
 }
 void cpu_op_0xFE(CPUState *cpu)
 {

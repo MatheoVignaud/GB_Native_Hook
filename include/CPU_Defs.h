@@ -99,6 +99,7 @@ typedef struct CPUState
     bool timer_prev_signal;      // Previous timer signal state (for falling edge detection)
     bool timer_reload_active;    // TIMA reload in progress (after overflow)
     uint8_t timer_reload_delay;  // Cycles remaining before reload completes
+    bool profile_data_reads_active; // true while executing an opcode body (not fetch/decode)
 } CPUState;
 
 static inline void setZ(CPUState *c, bool v)

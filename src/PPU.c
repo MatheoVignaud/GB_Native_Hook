@@ -1,5 +1,7 @@
 #include "PPU.h"
+#include "ViruaPPUBridge.h"
 
+#include <stdlib.h>
 #include <string.h>
 
 #define LCDC_ENABLE (1 << 7)
@@ -33,6 +35,58 @@ static void ppu_lcd_off(PPUState *ppu);
 static void ppu_clear_framebuffer(PPUState *ppu);
 static void ppu_eval_sprites(PPUState *ppu);
 static void ppu_render_pixel(PPUState *ppu, uint8_t x, uint8_t y);
+static void ppu_render_frame_with_viruappu(PPUState *ppu);
+
+static FILE *ppu_trace_file = NULL;
+static bool ppu_trace_enabled = false;
+static bool ppu_trace_inited = false;
+static bool ppu_vblank_log_enabled = false;
+static bool ppu_legacy_scanline_renderer = false;
+static uint32_t ppu_last_hash = 0;
+static uint32_t ppu_same_hash_count = 0;
+static uint64_t ppu_frame_counter = 0;
+
+static void ppu_trace_init(void)
+{
+    if (ppu_trace_inited)
+        return;
+    ppu_trace_inited = true;
+
+    const char *vblank_log_env = getenv("GB_LOG_PPU_VBLANK");
+    if (vblank_log_env && vblank_log_env[0] != '\0' && vblank_log_env[0] != '0')
+    {
+        ppu_vblank_log_enabled = true;
+    }
+
+    const char *legacy_scanline_env = getenv("GB_PPU_LEGACY_SCANLINE");
+    if (legacy_scanline_env && legacy_scanline_env[0] != '\0' && legacy_scanline_env[0] != '0')
+    {
+        ppu_legacy_scanline_renderer = true;
+    }
+
+    const char *trace_env = getenv("GB_TRACE_PPU");
+    if (!trace_env || trace_env[0] == '\0' || trace_env[0] == '0')
+        return;
+
+    ppu_trace_file = fopen("ppu_trace.log", "w");
+    if (!ppu_trace_file)
+        return;
+
+    ppu_trace_enabled = true;
+    fprintf(ppu_trace_file, "PPU trace enabled\n");
+    fflush(ppu_trace_file);
+}
+
+static uint32_t ppu_frame_hash(const uint32_t *pixels, size_t count)
+{
+    uint32_t h = 2166136261u;
+    for (size_t i = 0; i < count; ++i)
+    {
+        h ^= pixels[i];
+        h *= 16777619u;
+    }
+    return h;
+}
 
 static inline uint8_t ppu_vram_read(const PPUState *ppu, uint16_t addr)
 {
@@ -52,6 +106,51 @@ static void ppu_clear_framebuffer(PPUState *ppu)
     for (size_t i = 0; i < GB_SCREEN_WIDTH * GB_SCREEN_HEIGHT; ++i)
     {
         ppu->fb[i] = color;
+    }
+}
+
+static void ppu_render_frame_with_viruappu(PPUState *ppu)
+{
+    GBPPURegisters regs = {
+        .LCDC = ppu->mem->LCDC,
+        .SCY = ppu->mem->SCY,
+        .SCX = ppu->mem->SCX,
+        .BGP = ppu->mem->BGP,
+        .OBP0 = ppu->mem->OBP0,
+        .OBP1 = ppu->mem->OBP1,
+        .WY = ppu->mem->WY,
+        .WX = ppu->mem->WX,
+    };
+
+    viruappu_render_gb_frame(ppu->mem->vram,
+                             ppu->mem->oam,
+                             &regs,
+                             ppu->fb,
+                             GB_SCREEN_WIDTH);
+
+    if (ppu_trace_enabled && ppu_trace_file)
+    {
+        ppu_frame_counter++;
+        uint32_t h = ppu_frame_hash(ppu->fb, GB_SCREEN_WIDTH * GB_SCREEN_HEIGHT);
+        if (h == ppu_last_hash)
+            ppu_same_hash_count++;
+        else
+            ppu_same_hash_count = 0;
+        ppu_last_hash = h;
+
+        if (ppu_frame_counter <= 600 || ppu_same_hash_count == 600 || (ppu_frame_counter % 300) == 0)
+        {
+            fprintf(ppu_trace_file,
+                    "FRAME idx=%llu hash=%08X same=%u LCDC=%02X LY=%02X IF=%02X IE=%02X\n",
+                    (unsigned long long)ppu_frame_counter,
+                    h,
+                    ppu_same_hash_count,
+                    ppu->mem->LCDC,
+                    ppu->mem->LY,
+                    ppu->mem->IF,
+                    ppu->mem->IE);
+            fflush(ppu_trace_file);
+        }
     }
 }
 
@@ -125,22 +224,43 @@ static void ppu_eval_sprites(PPUState *ppu)
     ppu->sprite_count = limit;
 }
 
-void ppu_reset(PPUState *ppu)
+void ppu_reset(PPUState *ppu, bool bios_enabled)
 {
     assert(ppu);
-    // Valeurs proches du boot DMG
-    ppu->mem->LCDC = 0x91; // LCD ON, BG ON, BG Map 9800, tiles @8000, Sprites ON (8x8)
-    ppu->mem->STAT = 0x85;
-    ppu->mem->SCY = 0x00;
-    ppu->mem->SCX = 0x00;
-    ppu->mem->LY = 0x00;
-    ppu->mem->LYC = 0x00;
-    ppu->mem->DMA = 0xFF;
-    ppu->mem->BGP = 0xFC; // 11 11 00 => palette par défaut
-    ppu->mem->OBP0 = 0xFF;
-    ppu->mem->OBP1 = 0xFF;
-    ppu->mem->WY = 0x00;
-    ppu->mem->WX = 0x00;
+    ppu_trace_init();
+
+    if (bios_enabled)
+    {
+        // Power-on style state while boot ROM runs.
+        ppu->mem->LCDC = 0x00;
+        ppu->mem->STAT = 0x00;
+        ppu->mem->SCY = 0x00;
+        ppu->mem->SCX = 0x00;
+        ppu->mem->LY = 0x00;
+        ppu->mem->LYC = 0x00;
+        ppu->mem->DMA = 0xFF;
+        ppu->mem->BGP = 0x00;
+        ppu->mem->OBP0 = 0x00;
+        ppu->mem->OBP1 = 0x00;
+        ppu->mem->WY = 0x00;
+        ppu->mem->WX = 0x00;
+    }
+    else
+    {
+        // Post-boot defaults when starting without BIOS.
+        ppu->mem->LCDC = 0x91; // LCD ON, BG ON, BG Map 9800, tiles @8000, Sprites ON (8x8)
+        ppu->mem->STAT = 0x85;
+        ppu->mem->SCY = 0x00;
+        ppu->mem->SCX = 0x00;
+        ppu->mem->LY = 0x00;
+        ppu->mem->LYC = 0x00;
+        ppu->mem->DMA = 0xFF;
+        ppu->mem->BGP = 0xFC;
+        ppu->mem->OBP0 = 0xFF;
+        ppu->mem->OBP1 = 0xFF;
+        ppu->mem->WY = 0x00;
+        ppu->mem->WX = 0x00;
+    }
 
     ppu->dots = 0;
     ppu->frame_ready = false;
@@ -193,7 +313,7 @@ static void ppu_set_mode(PPUState *ppu, uint8_t mode)
         {
             static uint64_t vblank_counter = 0;
             vblank_counter++;
-            if (vblank_counter <= 3 || (vblank_counter % 100 == 0))
+            if (ppu_vblank_log_enabled && (vblank_counter <= 3 || (vblank_counter % 100 == 0)))
             {
                 printf("[PPU] Enter VBlank #%llu: LY=%02X IF(before)=%02X LCDC=%02X\n",
                        (unsigned long long)vblank_counter,
@@ -269,7 +389,7 @@ static void ppu_render_pixel(PPUState *ppu, uint8_t x, uint8_t y)
     if (lcdc & LCDC_BG_ENABLE)
     {
         uint16_t tile_map_base = (uint16_t)((lcdc & LCDC_BG_TILE_MAP) ? 0x9C00 : 0x9800);
-        uint16_t tile_data_base = (uint16_t)((lcdc & LCDC_BG_WINDOW_TILE_DATA) ? 0x8000 : 0x8800);
+        uint16_t tile_data_base = (uint16_t)((lcdc & LCDC_BG_WINDOW_TILE_DATA) ? 0x8000 : 0x9000);
         bool signed_indexing = (lcdc & LCDC_BG_WINDOW_TILE_DATA) == 0;
 
         uint8_t scx = ppu->mem->SCX;
@@ -353,6 +473,14 @@ static void ppu_render_pixel(PPUState *ppu, uint8_t x, uint8_t y)
 
 static void ppu_lcd_off(PPUState *ppu)
 {
+    if (!ppu->lcd_enabled)
+    {
+        ppu->mem->LY = 0;
+        ppu->mem->STAT = (uint8_t)((ppu->mem->STAT & ~STAT_MODE_MASK) | STAT_MODE_0);
+        ppu_update_lyc(ppu);
+        return;
+    }
+
     ppu->lcd_enabled = false;
     ppu->dots = 0;
     ppu->mem->LY = 0;
@@ -363,6 +491,32 @@ static void ppu_lcd_off(PPUState *ppu)
     ppu_clear_framebuffer(ppu);
     ppu->mem->STAT = (uint8_t)((ppu->mem->STAT & ~STAT_MODE_MASK) | STAT_MODE_0);
     ppu_update_lyc(ppu);
+}
+
+static inline uint8_t ppu_current_mode(const PPUState *ppu)
+{
+    if (ppu->mem->LY >= VBLANK_SCANLINE_START)
+        return STAT_MODE_1;
+    if (ppu->dots < 80)
+        return STAT_MODE_2;
+    if (ppu->dots < (80 + 172))
+        return STAT_MODE_3;
+    return STAT_MODE_0;
+}
+
+static inline uint32_t ppu_dots_until_boundary(const PPUState *ppu, uint8_t mode)
+{
+    switch (mode)
+    {
+    case STAT_MODE_2:
+        return 80u - ppu->dots;
+    case STAT_MODE_3:
+        return (80u + 172u) - ppu->dots;
+    case STAT_MODE_0:
+    case STAT_MODE_1:
+    default:
+        return DOTS_PER_SCANLINE - ppu->dots;
+    }
 }
 
 void ppu_step(PPUState *ppu, uint32_t cpu_cycles)
@@ -386,10 +540,11 @@ void ppu_step(PPUState *ppu, uint32_t cpu_cycles)
     }
 
     uint32_t dots_to_advance = cpu_cycles * DOTS_PER_CPU_CYCLE;
+    ppu_update_lyc(ppu);
 
-    for (uint32_t i = 0; i < dots_to_advance; ++i)
+    while (dots_to_advance > 0)
     {
-        if (ppu->dots == 0)
+        if (ppu->dots == 0 && ppu_legacy_scanline_renderer)
         {
             if (ppu->mem->LY < GB_SCREEN_HEIGHT)
             {
@@ -401,42 +556,36 @@ void ppu_step(PPUState *ppu, uint32_t cpu_cycles)
             }
         }
 
-        uint8_t mode;
-        if (ppu->mem->LY >= VBLANK_SCANLINE_START)
+        uint8_t mode = ppu_current_mode(ppu);
+
+        ppu_set_mode(ppu, mode);
+        uint32_t advance = ppu_dots_until_boundary(ppu, mode);
+        if (advance > dots_to_advance)
         {
-            mode = STAT_MODE_1;
-        }
-        else if (ppu->dots < 80)
-        {
-            mode = STAT_MODE_2;
-        }
-        else if (ppu->dots < 80 + 172)
-        {
-            mode = STAT_MODE_3;
-        }
-        else
-        {
-            mode = STAT_MODE_0;
+            advance = dots_to_advance;
         }
 
-        if (ppu->mem->LY == 0 && ppu->dots == 0 && mode == STAT_MODE_2)
+        if (ppu_legacy_scanline_renderer && mode == STAT_MODE_3)
         {
-            ppu->frame_ready = false;
-        }
-
-        if (mode == STAT_MODE_3)
-        {
-            int pixel_x = (int)ppu->dots - 80;
-            if (pixel_x >= 0 && pixel_x < GB_SCREEN_WIDTH && ppu->mem->LY < GB_SCREEN_HEIGHT)
+            uint32_t start_dot = ppu->dots;
+            uint32_t end_dot = ppu->dots + advance;
+            if (end_dot > 80u && ppu->mem->LY < GB_SCREEN_HEIGHT)
             {
-                ppu_render_pixel(ppu, (uint8_t)pixel_x, ppu->mem->LY);
+                uint32_t start_px = (start_dot > 80u) ? (start_dot - 80u) : 0u;
+                uint32_t end_px = end_dot - 80u;
+                if (end_px > GB_SCREEN_WIDTH)
+                {
+                    end_px = GB_SCREEN_WIDTH;
+                }
+                for (uint32_t px = start_px; px < end_px; ++px)
+                {
+                    ppu_render_pixel(ppu, (uint8_t)px, ppu->mem->LY);
+                }
             }
         }
 
-        ppu_set_mode(ppu, mode);
-        ppu_update_lyc(ppu);
-
-        ppu->dots++;
+        ppu->dots += advance;
+        dots_to_advance -= advance;
 
         if (ppu->dots >= DOTS_PER_SCANLINE)
         {
@@ -445,9 +594,14 @@ void ppu_step(PPUState *ppu, uint32_t cpu_cycles)
             if (ppu->mem->LY > VBLANK_SCANLINE_END)
             {
                 ppu->mem->LY = 0;
+                if (!ppu_legacy_scanline_renderer)
+                {
+                    ppu_render_frame_with_viruappu(ppu);
+                }
                 ppu->frame_ready = true;
             }
             ppu_update_lyc(ppu);
         }
     }
 }
+

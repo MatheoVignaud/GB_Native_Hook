@@ -45,7 +45,7 @@ typedef struct
     } scanline_sprites[10];
 } PPUState;
 
-void ppu_reset(PPUState *ppu);
+void ppu_reset(PPUState *ppu, bool bios_enabled);
 void ppu_step(PPUState *ppu, uint32_t cpu_cycles);
 
 #endif

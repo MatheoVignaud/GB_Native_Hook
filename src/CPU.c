@@ -1,6 +1,77 @@
 #include "CPU.h"
+#include "RecompProbe.h"
+
+#include <stdlib.h>
 
 static const int timer_bit_table[4] = {9, 3, 5, 7};
+extern uint64_t instruction_count;
+
+static FILE *cpu_trace_file = NULL;
+static bool cpu_trace_enabled = false;
+static bool cpu_trace_inited = false;
+static bool cpu_interrupt_log_enabled = false;
+static uint32_t cpu_progress_interval = 0;
+
+static void cpu_trace_init(void)
+{
+    if (cpu_trace_inited)
+        return;
+    cpu_trace_inited = true;
+
+    const char *interrupt_log_env = getenv("GB_LOG_INTERRUPTS");
+    if (interrupt_log_env && interrupt_log_env[0] != '\0' && interrupt_log_env[0] != '0')
+    {
+        cpu_interrupt_log_enabled = true;
+    }
+
+    const char *progress_env = getenv("GB_CPU_PROGRESS_EVERY");
+    if (progress_env && progress_env[0] != '\0')
+    {
+        unsigned long value = strtoul(progress_env, NULL, 10);
+        if (value > 0)
+        {
+            cpu_progress_interval = (uint32_t)value;
+        }
+    }
+
+    const char *trace_env = getenv("GB_TRACE_CPU");
+    if (!trace_env || trace_env[0] == '\0' || trace_env[0] == '0')
+        return;
+
+    cpu_trace_file = fopen("cpu_trace.log", "w");
+    if (cpu_trace_file)
+    {
+        cpu_trace_enabled = true;
+        fprintf(cpu_trace_file, "CPU trace enabled\n");
+        fflush(cpu_trace_file);
+    }
+}
+
+static void cpu_trace_log(CPUState *cpu, const char *event)
+{
+    if (!cpu_trace_enabled || !cpu_trace_file)
+        return;
+
+    fprintf(cpu_trace_file,
+            "%s ic=%llu cyc=%llu PC=%04X SP=%04X AF=%04X BC=%04X DE=%04X HL=%04X IME=%d HALT=%d STOP=%d IE=%02X IF=%02X LY=%02X OP=%02X\n",
+            event,
+            (unsigned long long)instruction_count,
+            (unsigned long long)cpu->cycle_count,
+            cpu->PC,
+            cpu->SP,
+            cpu->AF,
+            cpu->BC,
+            cpu->DE,
+            cpu->HL,
+            cpu->IME ? 1 : 0,
+            cpu->halt ? 1 : 0,
+            cpu->stop ? 1 : 0,
+            cpu->memory->memory.IE,
+            cpu->memory->memory.IF,
+            cpu->memory->memory.LY,
+            memory_read(cpu->memory, cpu->PC));
+    fflush(cpu_trace_file);
+}
 
 static inline bool cpu_timer_enabled(const CPUState *cpu)
 {
@@ -90,7 +161,7 @@ static uint32_t cpu_service_interrupts(CPUState *cpu)
         return 0;
 
     static int interrupt_log_count = 0;
-    if (interrupt_log_count < 5)
+    if (cpu_interrupt_log_enabled && interrupt_log_count < 5)
     {
         printf("[CPU] Pending interrupts: %02X IE=%02X IF=%02X PC=%04X\n",
                pending,
@@ -120,6 +191,7 @@ static uint32_t cpu_service_interrupts(CPUState *cpu)
             memory_write(cpu->memory, --cpu->SP, (uint8_t)((cpu->PC >> 8) & 0xFF));
             memory_write(cpu->memory, --cpu->SP, (uint8_t)(cpu->PC & 0xFF));
             cpu->PC = vectors[i];
+            recomp_probe_on_interrupt(cpu, vectors[i]);
             return 5;
         }
     }
@@ -129,6 +201,8 @@ static uint32_t cpu_service_interrupts(CPUState *cpu)
 
 void cpu_reset(CPUState *cpu)
 {
+    cpu_trace_init();
+
     cpu->A = 0;
     cpu->F = 0;
     cpu->B = 0;
@@ -160,19 +234,47 @@ void cpu_reset(CPUState *cpu)
     cpu->timer_reload_active = false;
     cpu->timer_reload_delay = 0;
     cpu->timer_prev_signal = cpu_timer_signal(cpu);
+    cpu->profile_data_reads_active = false;
 
     cpu->cycle_count = 2;
     cpu->memory->memory.DIV = 0;
     cpu->memory->memory.IF = 0;
     cpu->memory->memory.TIMA = 0;
+
+    cpu_trace_log(cpu, "RESET");
+    recomp_probe_seed_entry(cpu, cpu->PC);
 }
 
 uint64_t instruction_count = 0;
 
-uint16_t breakpoints[] = {0x0040, 0x017E, 0x0205, 0x02ED};
+uint16_t breakpoints[] = {};
 
-uint32_t cpu_execute_instruction(CPUState *cpu)
+static uint32_t cpu_execute_common(CPUState *cpu, bool opcode_predecoded, uint8_t predecoded_opcode)
 {
+    uint8_t opcode = predecoded_opcode;
+    if (!opcode_predecoded)
+    {
+        opcode = memory_read(cpu->memory, cpu->PC);
+    }
+
+    CPUDecodedStep step = {0};
+    uint32_t early_cycles = cpu_decoded_step_begin(cpu, opcode, &step);
+    if (early_cycles != 0)
+    {
+        return early_cycles;
+    }
+
+    opcodes[opcode](cpu);
+    return cpu_decoded_step_end(cpu, &step);
+}
+
+uint32_t cpu_decoded_step_begin(CPUState *cpu, uint8_t opcode, CPUDecodedStep *step)
+{
+    if (!cpu || !step)
+        return 0;
+
+    cpu->profile_data_reads_active = false;
+
     if (cpu->EI_pending)
     {
         cpu->IME_enable_pending = true;
@@ -193,23 +295,33 @@ uint32_t cpu_execute_instruction(CPUState *cpu)
         }
     }
 
-    uint32_t total_cycles = 0;
-    bool executed_instruction = false;
-
     uint32_t interrupt_cycles = cpu_service_interrupts(cpu);
     if (interrupt_cycles)
     {
+        cpu_trace_log(cpu, "INT");
         cpu_update_timers(cpu, interrupt_cycles);
         return interrupt_cycles;
     }
 
     if (cpu->stop)
     {
+        static uint32_t stop_idle_counter = 0;
+        stop_idle_counter++;
+        if ((stop_idle_counter % 100000) == 0)
+        {
+            cpu_trace_log(cpu, "STOP-IDLE");
+        }
         return cpu_idle_cycles(cpu, 1);
     }
 
     if (cpu->halt)
     {
+        static uint32_t halt_idle_counter = 0;
+        halt_idle_counter++;
+        if ((halt_idle_counter % 100000) == 0)
+        {
+            cpu_trace_log(cpu, "HALT-IDLE");
+        }
         return cpu_idle_cycles(cpu, 1);
     }
 
@@ -227,15 +339,15 @@ uint32_t cpu_execute_instruction(CPUState *cpu)
         }
     }
 
-    if (instruction_count % 20000 == 0)
+    if (cpu_progress_interval > 0 && (instruction_count % cpu_progress_interval) == 0)
     {
         printf("PC=%04X SP=%04X AF=%04X BC=%04X DE=%04X HL=%04X IME=%d IE=%02X IF=%02X LY=%02X OP=%02X\n",
                cpu->PC, cpu->SP, cpu->AF, cpu->BC, cpu->DE, cpu->HL, cpu->IME,
                cpu->memory->memory.IE, cpu->memory->memory.IF, cpu->memory->memory.LY,
-               memory_read(cpu->memory, cpu->PC));
+                memory_read(cpu->memory, cpu->PC));
     }
 
-    uint64_t prev_cycles = cpu->cycle_count;
+    step->prev_cycles = cpu->cycle_count;
 
     uint16_t fetch_pc = cpu->PC;
     if (!cpu->halt_bug)
@@ -247,23 +359,42 @@ uint32_t cpu_execute_instruction(CPUState *cpu)
         cpu->halt_bug = false;
     }
 
-    uint8_t opcode = memory_read(cpu->memory, fetch_pc);
-    opcodes[opcode](cpu);
-    executed_instruction = true;
+    if (cpu_trace_enabled && (instruction_count < 500000 || (instruction_count % 50000) == 0))
+    {
+        cpu_trace_log(cpu, "EXEC");
+    }
+    recomp_probe_on_instruction(cpu, fetch_pc, opcode);
+    cpu->profile_data_reads_active = true;
+    return 0;
+}
 
+uint32_t cpu_decoded_step_end(CPUState *cpu, CPUDecodedStep *step)
+{
+    if (!cpu || !step)
+        return 0;
+    cpu->profile_data_reads_active = false;
     instruction_count++;
 
-    uint32_t cycles = (uint32_t)(cpu->cycle_count - prev_cycles);
+    uint32_t cycles = (uint32_t)(cpu->cycle_count - step->prev_cycles);
     cpu_update_timers(cpu, cycles);
-    total_cycles += cycles;
 
-    if (executed_instruction && cpu->IME_enable_pending)
+    if (cpu->IME_enable_pending)
     {
         cpu->IME = true;
         cpu->IME_enable_pending = false;
     }
 
-    return total_cycles;
+    return cycles;
+}
+
+uint32_t cpu_execute_instruction(CPUState *cpu)
+{
+    return cpu_execute_common(cpu, false, 0u);
+}
+
+uint32_t cpu_execute_decoded_instruction(CPUState *cpu, uint8_t opcode)
+{
+    return cpu_execute_common(cpu, true, opcode);
 }
 
 void cpu_timer_div_write(CPUState *cpu)

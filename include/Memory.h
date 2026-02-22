@@ -26,6 +26,61 @@ typedef enum
     JOYPAD_START = 7
 } JoypadInput;
 
+typedef enum
+{
+    MBC_NONE = 0,
+    MBC1,
+    MBC2,
+    MBC3,
+    MBC5
+} MBCType;
+
+typedef struct
+{
+    MBCType mbc_type;
+    uint8_t cartridge_type;
+    bool has_battery;
+    bool has_rtc;
+    bool has_ram;
+
+    uint8_t *rom_data;
+    size_t rom_size;
+    size_t rom_banks;
+
+    uint8_t *ram_data;
+    size_t ram_size;
+    size_t ram_banks;
+    bool ram_dirty;
+
+    bool ram_enabled;
+
+    // MBC1
+    uint8_t mbc1_low5;
+    uint8_t mbc1_high2;
+    uint8_t mbc1_mode;
+
+    // MBC2
+    uint8_t mbc2_rom_bank;
+
+    // MBC3
+    uint8_t mbc3_rom_bank;
+    uint8_t mbc3_ram_rtc_select;
+    uint8_t mbc3_latch_state;
+    uint8_t mbc3_rtc_regs[5];      // S, M, H, DL, DH
+    uint8_t mbc3_rtc_latched[5];   // Latched snapshot after 0->1 transition
+    bool mbc3_rtc_latched_valid;
+    uint64_t mbc3_rtc_last_unix;   // Host timestamp used for coarse ticking
+    bool rtc_dirty;
+
+    // MBC5
+    uint16_t mbc5_rom_bank;
+    uint8_t mbc5_ram_bank;
+
+    bool persist_loaded;
+    char save_path[512];
+    char rtc_path[512];
+} CartridgeState;
+
 struct CPUState;
 
 #if defined(_MSC_VER)
@@ -171,6 +226,7 @@ _Static_assert(OFFS(Memory, BOOT) == 0xFF50, "BOOT");
 typedef struct
 {
     Memory memory;
+    CartridgeState cartridge;
     uint8_t bios[0x100]; // BIOS ROM (256 bytes)
     bool bios_enabled;
     struct CPUState *cpu; // Back-reference for side effects (timers, etc.)
@@ -179,12 +235,19 @@ typedef struct
     uint8_t joypad_select;  // Bits 4/5 selection latch
 } MemoryState;
 
-int load_rom(const char *path, uint8_t *mem);
+int load_rom(const char *path, MemoryState *mem);
+int load_rom_from_buffer(const uint8_t *data, size_t size, MemoryState *mem);
 int load_bios(const char *path, uint8_t *bios);
 
 void memory_init(MemoryState *mem);
+void memory_shutdown(MemoryState *mem);
+void memory_set_logging(bool enabled);
 
 void memory_set_button_state(MemoryState *mem, JoypadInput input, bool pressed);
+void memory_set_save_path_hint(MemoryState *mem, const char *rom_path);
+void memory_flush_rom_read_trace(void);
+void memory_set_fetch_patch(uint16_t start, const uint8_t *bytes, uint8_t len);
+void memory_clear_fetch_patch(void);
 
 uint8_t memory_read(MemoryState *mem, uint16_t address);
 void memory_write(MemoryState *mem, uint16_t address, uint8_t value);

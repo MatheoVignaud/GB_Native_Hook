@@ -5,6 +5,8 @@
 #include <stdint.h>
 #include <stdio.h>
 
+void cpu_illegal_opcode(CPUState *cpu, uint8_t opcode);
+
 // Define CPU operation codes (opcodes)
 void cpu_op_0x00(CPUState *cpu);
 void cpu_op_0x01(CPUState *cpu);

@@ -602,7 +602,7 @@ static inline void rlc_r8(uint8_t *reg, CPUState *cpu)
     if (new_carry)
         cpu->F |= FLAG_C;
 
-    cpu->cycle_count += 1;
+    cpu->cycle_count += 2;
 }
 
 static inline void rlc_hl(CPUState *cpu)
@@ -619,7 +619,7 @@ static inline void rlc_hl(CPUState *cpu)
     if (new_carry)
         cpu->F |= FLAG_C;
 
-    cpu->cycle_count += 3;
+    cpu->cycle_count += 4;
 }
 
 static inline void rlca(CPUState *cpu)
@@ -660,7 +660,7 @@ static inline void rrc_r8(uint8_t *reg, CPUState *cpu)
     if (new_carry)
         cpu->F |= FLAG_C;
 
-    cpu->cycle_count += 1;
+    cpu->cycle_count += 2;
 }
 
 static inline void rrc_hl(CPUState *cpu)
@@ -677,7 +677,7 @@ static inline void rrc_hl(CPUState *cpu)
     if (new_carry)
         cpu->F |= FLAG_C;
 
-    cpu->cycle_count += 3;
+    cpu->cycle_count += 4;
 }
 
 static inline void rl_r8(uint8_t *reg, CPUState *cpu)
@@ -693,7 +693,7 @@ static inline void rl_r8(uint8_t *reg, CPUState *cpu)
     if (new_carry)
         cpu->F |= FLAG_C;
 
-    cpu->cycle_count += 1;
+    cpu->cycle_count += 2;
 }
 
 static inline void rl_hl(CPUState *cpu)
@@ -711,7 +711,7 @@ static inline void rl_hl(CPUState *cpu)
     if (new_carry)
         cpu->F |= FLAG_C;
 
-    cpu->cycle_count += 3;
+    cpu->cycle_count += 4;
 }
 
 static inline void swap_r8(uint8_t *reg, CPUState *cpu)
@@ -797,7 +797,7 @@ static inline void srl_hl(CPUState *cpu)
         cpu->F |= FLAG_Z;
     if (new_carry)
         cpu->F |= FLAG_C;
-    cpu->cycle_count += 3;
+    cpu->cycle_count += 4;
 }
 
 static inline void sra_r8(uint8_t *reg, CPUState *cpu)
@@ -813,7 +813,7 @@ static inline void sra_r8(uint8_t *reg, CPUState *cpu)
     if (new_carry)
         cpu->F |= FLAG_C;
 
-    cpu->cycle_count += 1;
+    cpu->cycle_count += 2;
 }
 
 static inline void sra_hl(CPUState *cpu)
@@ -831,7 +831,7 @@ static inline void sra_hl(CPUState *cpu)
     if (new_carry)
         cpu->F |= FLAG_C;
 
-    cpu->cycle_count += 3;
+    cpu->cycle_count += 4;
 }
 
 static inline void rr_r8(uint8_t *reg, CPUState *cpu)
@@ -1103,6 +1103,8 @@ static inline void nop(CPUState *cpu)
 
 static inline void stop(CPUState *cpu)
 {
+    // STOP is a 2-byte instruction (0x10 0x00): consume the trailing byte.
+    cpu->PC++;
     cpu->stop = true;
     cpu->halt = false;
     cpu->halt_bug = false;
