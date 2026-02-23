@@ -827,23 +827,31 @@ def emit_function_definitions(out: List[str],
                                     inline_seen: Set[int]) -> None:
             succ_keys = [k for k in _local_successor_keys_for_insn(cur_key, cur_ibytes) if k in owned_key_set]
             emitted_terminal_transfer = False
+            force_runtime_key_check = False
 
             if len(succ_keys) == 1 and _has_deterministic_single_successor(cur_ibytes):
                 sk = succ_keys[0]
-                can_inline = (
-                    sk != cur_key and
-                    sk not in inline_seen and
-                    inline_depth < MAX_INLINE_TRACE_DEPTH and
-                    local_pred_count.get(sk, 0) <= 1
-                )
-                if can_inline:
-                    out.append(f"    /* trace-inline {sk:08X} */")
-                    emit_key_body(sk, emit_label=False, inline_depth=inline_depth + 1, inline_seen=(inline_seen | {sk}))
-                    emitted_terminal_transfer = True
-                else:
-                    out.append(f"    goto {key_label_name(sk)};")
-                    emitted_terminal_transfer = True
-            elif succ_keys:
+                sk_pc = sk & 0xFFFF
+                # Switchable ROM window (0x4000-0x7FFF) is bank-dependent at runtime.
+                # Even with a single static successor, a preceding MBC write can change
+                # which bank should execute next, so direct goto/trace-inline is unsafe.
+                if 0x4000 <= sk_pc < 0x8000:
+                    force_runtime_key_check = True
+                if not force_runtime_key_check:
+                    can_inline = (
+                        sk != cur_key and
+                        sk not in inline_seen and
+                        inline_depth < MAX_INLINE_TRACE_DEPTH and
+                        local_pred_count.get(sk, 0) <= 1
+                    )
+                    if can_inline:
+                        out.append(f"    /* trace-inline {sk:08X} */")
+                        emit_key_body(sk, emit_label=False, inline_depth=inline_depth + 1, inline_seen=(inline_seen | {sk}))
+                        emitted_terminal_transfer = True
+                    else:
+                        out.append(f"    goto {key_label_name(sk)};")
+                        emitted_terminal_transfer = True
+            if (succ_keys and not emitted_terminal_transfer) and (len(succ_keys) > 1 or force_runtime_key_check):
                 out.append("    {")
                 out.append("        uint32_t __next_key = recomp_make_pc_key(&g_memory, g_cpu.PC);")
                 for sk in succ_keys:
