@@ -191,7 +191,15 @@ FUNC_JSON_RE = re.compile(r"^func_b([0-9]+)_([0-9A-Fa-f]{4})\.json$")
 FUNC_INPUTS_JSON_RE = re.compile(r"^func_b([0-9]+)_([0-9A-Fa-f]{4})\.inputs\.json$")
 
 
-def parse_dump_entry_keys(input_dir: Path) -> set[tuple[int, int]]:
+def is_heuristic_scan_reason(reason: object) -> bool:
+    if not isinstance(reason, str):
+        return False
+    r = reason.strip().upper()
+    # Keep REF_CALL_SCAN seeds by default; only exclude the noisier JP scan.
+    return r == "REF_JP_SCAN"
+
+
+def parse_dump_entry_keys(input_dir: Path, include_scan_dumps: bool = False) -> set[tuple[int, int]]:
     out: set[tuple[int, int]] = set()
     if not input_dir.is_dir():
         return out
@@ -199,6 +207,13 @@ def parse_dump_entry_keys(input_dir: Path) -> set[tuple[int, int]]:
         m = FUNC_JSON_RE.match(p.name)
         if not m:
             continue
+        if not include_scan_dumps:
+            try:
+                data = json.loads(p.read_text(encoding="utf-8", errors="ignore"))
+            except Exception:
+                data = None
+            if isinstance(data, dict) and is_heuristic_scan_reason(data.get("reason")):
+                continue
         try:
             bank = int(m.group(1), 10)
             addr = int(m.group(2), 16)
@@ -210,11 +225,11 @@ def parse_dump_entry_keys(input_dir: Path) -> set[tuple[int, int]]:
     return out
 
 
-def merge_dump_entries_into_seeds(input_dir: Path) -> tuple[int, int]:
+def merge_dump_entries_into_seeds(input_dir: Path, include_scan_dumps: bool = False) -> tuple[int, int]:
     seed_keys_file = input_dir / "recompiled_seed_keys.txt"
     seeds = parse_seed_keys_file(seed_keys_file)
     before = len(seeds)
-    seeds.update(parse_dump_entry_keys(input_dir))
+    seeds.update(parse_dump_entry_keys(input_dir, include_scan_dumps=include_scan_dumps))
     write_seed_keys_file(seed_keys_file, seeds)
     return len(seeds) - before, len(seeds)
 
@@ -395,6 +410,7 @@ def main() -> int:
     parser.add_argument("--target", default="GB_Recompiled", help="xmake target name to build")
     parser.add_argument("--generated-c", default="generated/recompiled_main.c", help="Generated C output path")
     parser.add_argument("--shard-funcs", default="256", help="Approx number of functions per generated shard C file")
+    parser.add_argument("--include-scan-dumps", action="store_true", help="Include heuristic REF_*_SCAN dumps in seed import/codegen (unsafe)")
     parser.add_argument("--output-exe", default="", help="Optional output executable path")
     parser.add_argument("--read-trace", default="", help="Optional ROM read trace file (ranges from GB_ROM_READ_TRACE_PATH)")
     parser.add_argument(
@@ -484,7 +500,10 @@ def main() -> int:
         )
 
     if seed_dir_hint and seed_dir_hint.is_dir():
-        added_from_dumps, total_seed_count = merge_dump_entries_into_seeds(seed_dir_hint)
+        added_from_dumps, total_seed_count = merge_dump_entries_into_seeds(
+            seed_dir_hint,
+            include_scan_dumps=bool(args.include_scan_dumps),
+        )
         if added_from_dumps > 0:
             print(
                 f"[recomp_build] seeded static pass from existing dumps -> {seed_dir_hint / 'recompiled_seed_keys.txt'} "
@@ -615,6 +634,8 @@ def main() -> int:
         "--shard-funcs",
         str(args.shard_funcs),
     ]
+    if args.include_scan_dumps:
+        codegen_cmd.append("--include-scan-dumps")
 
     if not args.no_embed_assets:
         codegen_cmd.extend(["--embed-rom", str(rom_file)])

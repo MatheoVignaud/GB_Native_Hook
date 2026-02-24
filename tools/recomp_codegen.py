@@ -108,7 +108,16 @@ def parse_rom_read_trace(path: str) -> Set[int]:
     return offsets
 
 
-def parse_functions(input_dir: str) -> Tuple[List[FunctionDesc], Dict[int, int], Set[int]]:
+def _is_heuristic_scan_reason(reason: object) -> bool:
+    if not isinstance(reason, str):
+        return False
+    r = reason.strip().upper()
+    # REF_CALL_SCAN is generally useful/valid in practice; REF_JP_SCAN is much
+    # noisier and has produced bogus ownership (e.g. low-address NOP blobs).
+    return r == "REF_JP_SCAN"
+
+
+def parse_functions(input_dir: str, include_scan_dumps: bool = False) -> Tuple[List[FunctionDesc], Dict[int, int], Set[int]]:
     dump_name_re = re.compile(r"^func_b[0-9]+_[0-9A-Fa-f]{4}\.json$")
     paths = []
     for path in sorted(glob.glob(os.path.join(input_dir, "func_b*_*.json"))):
@@ -123,6 +132,8 @@ def parse_functions(input_dir: str) -> Tuple[List[FunctionDesc], Dict[int, int],
     for path in paths:
         with open(path, "r", encoding="utf-8") as f:
             data = json.load(f)
+        if not include_scan_dumps and _is_heuristic_scan_reason(data.get("reason")):
+            continue
 
         entry = data.get("entry", {})
         bank = int(entry.get("bank", 0))
@@ -342,10 +353,15 @@ def build_owner_map(funcs: List[FunctionDesc]) -> List[Tuple[int, str]]:
         entry_bank = fn.bank if fn.addr >= 0x4000 else 0
         owner[make_key(entry_bank, fn.addr)] = fn.symbol
 
-    # Aggressive-but-bounded cluster fusion: merge symbols connected by simple,
-    # deterministic local CFG edges (fallthrough / JP/JR unconditional only).
-    # This increases local goto chaining and reduces dispatch frequency without
-    # relying on C tail-call optimization.
+    # Cluster fusion is disabled by default because even conservative merges can
+    # produce ownership/CFG regressions on some games (white screen / boot stall)
+    # when dumps contain imperfect discovery. Keep the code path for future
+    # opt-in tuning, but default to stable one-function ownership.
+    ENABLE_CLUSTER_FUSION = False
+
+    # Aggressive-but-bounded cluster fusion (opt-in): merge symbols connected by
+    # static CFG edges. This increases local goto chaining and reduces dispatch
+    # frequency without relying on C tail-call optimization.
     symbol_keys: Dict[str, Set[int]] = {}
     for key, sym in owner.items():
         symbol_keys.setdefault(sym, set()).add(key)
@@ -373,21 +389,22 @@ def build_owner_map(funcs: List[FunctionDesc]) -> List[Tuple[int, str]]:
         parent[rb] = ra
         comp_size[ra] += comp_size[rb]
 
-    for key, sym in list(owner.items()):
-        ibytes = key_to_ibytes.get(key)
-        if not ibytes:
-            continue
-        if not _is_cluster_mergeable_edge_insn(ibytes):
-            continue
-        for succ in _local_successor_keys_for_insn(key, ibytes):
-            succ &= 0xFFFFFFFF
-            succ_sym = owner.get(succ)
-            if succ_sym is None or succ_sym == sym:
+    if ENABLE_CLUSTER_FUSION:
+        for key, sym in list(owner.items()):
+            ibytes = key_to_ibytes.get(key)
+            if not ibytes:
                 continue
-            # Keep merges within the same ROM bank view to avoid giant cross-bank components.
-            if ((key >> 16) & 0xFFFF) != ((succ >> 16) & 0xFFFF):
+            if not _is_cluster_mergeable_edge_insn(ibytes):
                 continue
-            union(sym, succ_sym)
+            for succ in _local_successor_keys_for_insn(key, ibytes):
+                succ &= 0xFFFFFFFF
+                succ_sym = owner.get(succ)
+                if succ_sym is None or succ_sym == sym:
+                    continue
+                # Keep merges within the same ROM bank view to avoid giant cross-bank components.
+                if ((key >> 16) & 0xFFFF) != ((succ >> 16) & 0xFFFF):
+                    continue
+                union(sym, succ_sym)
 
     fused_owner: Dict[int, str] = {}
     for key, sym in owner.items():
@@ -764,15 +781,12 @@ def _is_cluster_mergeable_edge_insn(ibytes: List[int]) -> bool:
         return True
     if op in (0xC0, 0xC8, 0xD0, 0xD8):  # RET cc (false branch is static)
         return True
-    if op == 0xCD:  # CALL n16
-        return True
-    if op in (0xC4, 0xCC, 0xD4, 0xDC):  # CALL cc
-        return True
-    if op in (0xC7, 0xCF, 0xD7, 0xDF, 0xE7, 0xEF, 0xF7, 0xFF):  # RST
-        return True
     if op in (
         0x10, 0x76,             # STOP, HALT
         0xE9,                   # JP(HL)
+        0xCD,                   # CALL
+        0xC4, 0xCC, 0xD4, 0xDC, # CALL cc
+        0xC7, 0xCF, 0xD7, 0xDF, 0xE7, 0xEF, 0xF7, 0xFF,  # RST
         0xC9, 0xD9,             # RET, RETI
     ):
         return False
@@ -790,7 +804,9 @@ def _has_deterministic_single_successor(ibytes: List[int]) -> bool:
         0xE9,                   # JP(HL)
         0x20, 0x28, 0x30, 0x38, # JR cc
         0xC2, 0xCA, 0xD2, 0xDA, # JP cc
+        0xCD,                   # CALL n16
         0xC4, 0xCC, 0xD4, 0xDC, # CALL cc
+        0xC7, 0xCF, 0xD7, 0xDF, 0xE7, 0xEF, 0xF7, 0xFF,  # RST
         0xC9, 0xD9,             # RET, RETI
         0xC0, 0xC8, 0xD0, 0xD8, # RET cc
     ):
@@ -809,13 +825,18 @@ def emit_function_definitions(out: List[str],
         owned_key_set = set(owned_keys)
         single_key_fn = len(owned_keys) == 1
         owned_keys_sorted = sorted(owned_keys)
+        # Stability-first default: always re-evaluate next key at runtime instead of
+        # jumping directly to a static successor label.
+        ENABLE_DIRECT_LOCAL_GOTO = False
         local_pred_count: Dict[int, int] = {k: 0 for k in owned_keys}
         for src_key in owned_keys:
             src_ibytes = insn_by_key.get(src_key, [])
             for sk in _local_successor_keys_for_insn(src_key, src_ibytes):
                 if sk in owned_key_set:
                     local_pred_count[sk] = local_pred_count.get(sk, 0) + 1
-        MAX_INLINE_TRACE_DEPTH = 3
+        # Off by default: trace duplication made some games regress (runtime stalls).
+        # Keep the machinery so it can be re-enabled later behind a flag.
+        MAX_INLINE_TRACE_DEPTH = 0
 
         def key_label_name(key: int) -> str:
             return f"L_{key:08X}"
@@ -827,23 +848,41 @@ def emit_function_definitions(out: List[str],
                                     inline_seen: Set[int]) -> None:
             succ_keys = [k for k in _local_successor_keys_for_insn(cur_key, cur_ibytes) if k in owned_key_set]
             emitted_terminal_transfer = False
+            force_runtime_key_check = False
 
-            if len(succ_keys) == 1 and _has_deterministic_single_successor(cur_ibytes):
+            if ENABLE_DIRECT_LOCAL_GOTO and len(succ_keys) == 1 and _has_deterministic_single_successor(cur_ibytes):
                 sk = succ_keys[0]
-                can_inline = (
-                    sk != cur_key and
-                    sk not in inline_seen and
-                    inline_depth < MAX_INLINE_TRACE_DEPTH and
-                    local_pred_count.get(sk, 0) <= 1
-                )
-                if can_inline:
-                    out.append(f"    /* trace-inline {sk:08X} */")
-                    emit_key_body(sk, emit_label=False, inline_depth=inline_depth + 1, inline_seen=(inline_seen | {sk}))
-                    emitted_terminal_transfer = True
-                else:
-                    out.append(f"    goto {key_label_name(sk)};")
-                    emitted_terminal_transfer = True
-            elif succ_keys:
+                sk_pc = sk & 0xFFFF
+                # Switchable ROM window (0x4000-0x7FFF) is bank-dependent at runtime.
+                # Even with a single static successor, a preceding MBC write can change
+                # which bank should execute next, so direct goto/trace-inline is unsafe.
+                if 0x4000 <= sk_pc < 0x8000:
+                    force_runtime_key_check = True
+                if not force_runtime_key_check:
+                    can_inline = (
+                        sk != cur_key and
+                        sk not in inline_seen and
+                        inline_depth < MAX_INLINE_TRACE_DEPTH and
+                        local_pred_count.get(sk, 0) <= 1
+                    )
+                    if can_inline:
+                        out.append("    if (!g_running)")
+                        out.append("        return;")
+                        out.append(f"    /* trace-inline {sk:08X} */")
+                        emit_key_body(sk, emit_label=False, inline_depth=inline_depth + 1, inline_seen=(inline_seen | {sk}))
+                        emitted_terminal_transfer = True
+                    else:
+                        out.append("    if (!g_running)")
+                        out.append("        return;")
+                        out.append(f"    goto {key_label_name(sk)};")
+                        emitted_terminal_transfer = True
+            # Safe local chaining path: even with a single static successor, we can
+            # still avoid the full __dispatch scan by recomputing the runtime key
+            # and checking only local candidate(s). This preserves correctness for
+            # interrupts / bank changes while reducing dispatch overhead.
+            if succ_keys and not emitted_terminal_transfer:
+                out.append("    if (!g_running)")
+                out.append("        return;")
                 out.append("    {")
                 out.append("        uint32_t __next_key = recomp_make_pc_key(&g_memory, g_cpu.PC);")
                 for sk in succ_keys:
@@ -854,8 +893,10 @@ def emit_function_definitions(out: List[str],
 
             if not emitted_terminal_transfer:
                 if not single_key_fn:
+                    # __dispatch performs the g_running check already.
                     out.append("    goto __dispatch;")
                 else:
+                    # Returning unconditionally already covers the !g_running case.
                     out.append("    return;")
 
         def emit_key_body(key: int,
@@ -885,8 +926,6 @@ def emit_function_definitions(out: List[str],
             if pc >= 0x8000:
                 out.append("        cpu_set_illegal_opcode_softfail(0);")
             out.append("    }")
-            out.append("    if (!g_running)")
-            out.append("        return;")
             emit_transfer_after_key(key, ibytes, inline_depth=inline_depth, inline_seen=inline_seen)
             out.append("")
 
@@ -3061,13 +3100,14 @@ def main() -> int:
     parser.add_argument("--embed-full-rom", action="store_true", help="Embed the full ROM image (testing mode, disables sparse asset selection)")
     parser.add_argument("--read-trace", default="", help="Optional GB_ROM_READ_TRACE_PATH output file")
     parser.add_argument("--shard-funcs", default="256", help="Approx number of functions per generated shard C file")
+    parser.add_argument("--include-scan-dumps", action="store_true", help="Include heuristic REF_*_SCAN dumps (unsafe, can cause bogus code ownership)")
     args = parser.parse_args()
 
     input_dir = os.path.normpath(args.input_dir)
     if not os.path.isdir(input_dir):
         raise SystemExit(f"Input directory not found: {input_dir}")
 
-    funcs, discovered_rom_bytes, code_banks = parse_functions(input_dir)
+    funcs, discovered_rom_bytes, code_banks = parse_functions(input_dir, include_scan_dumps=bool(args.include_scan_dumps))
     if not funcs:
         raise SystemExit(f"No function JSON found in: {input_dir}")
     dynram_funcs = parse_dynram_dumps(input_dir)
