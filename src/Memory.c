@@ -1621,3 +1621,13 @@ void memory_flush_rom_read_trace(void)
 {
     rom_read_trace_flush();
 }
+
+size_t memory_get_rom_read_unique_count(void)
+{
+    return rom_read_unique_count;
+}
+
+size_t memory_get_rom_read_track_size(void)
+{
+    return rom_read_track_size;
+}

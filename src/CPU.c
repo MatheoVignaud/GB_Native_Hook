@@ -363,6 +363,10 @@ uint32_t cpu_decoded_step_begin(CPUState *cpu, uint8_t opcode, CPUDecodedStep *s
     {
         cpu_trace_log(cpu, "EXEC");
     }
+    if (fetch_pc >= 0x8000u)
+    {
+        recomp_probe_dyn_dump_code(cpu, fetch_pc, "EXEC");
+    }
     recomp_probe_on_instruction(cpu, fetch_pc, opcode);
     cpu->profile_data_reads_active = true;
     return 0;

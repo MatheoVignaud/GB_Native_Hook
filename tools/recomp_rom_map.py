@@ -228,18 +228,30 @@ def main() -> int:
     both = code_offsets & asset_offsets
     asset_only = asset_offsets - code_offsets
     code_only = code_offsets - asset_offsets
+    covered = code_offsets | asset_offsets
 
     width, height, rgb = build_image(rom_size, code_offsets, asset_offsets)
 
     output = Path(args.output).resolve() if args.output else (input_dir / "rom_map.png")
     write_png_rgb(output, width, height, rgb)
 
+    def pct(n: int) -> str:
+        return f"{(100.0 * n / rom_size):.2f}%"
+
     print(f"[rom_map] input_dir={input_dir}")
     print(f"[rom_map] output={output}")
     print(f"[rom_map] size={rom_size} bytes side={width} pixels padding={(width*height)-rom_size}")
     print(f"[rom_map] dumps_used={dump_count} skipped_ref_jp_scan={skipped_ref_jp}")
-    print(f"[rom_map] code_bytes={len(code_offsets)} asset_bytes={len(asset_offsets)} overlap={len(both)}")
-    print(f"[rom_map] code_only={len(code_only)} asset_only={len(asset_only)} uncovered={rom_size - len(code_offsets | asset_offsets)}")
+    print(
+        f"[rom_map] code_bytes={len(code_offsets)} ({pct(len(code_offsets))}) "
+        f"asset_bytes={len(asset_offsets)} ({pct(len(asset_offsets))}) overlap={len(both)} ({pct(len(both))})"
+    )
+    print(
+        f"[rom_map] code_only={len(code_only)} ({pct(len(code_only))}) "
+        f"asset_only={len(asset_only)} ({pct(len(asset_only))}) "
+        f"uncovered={rom_size - len(covered)} ({pct(rom_size - len(covered))})"
+    )
+    print(f"[rom_map] covered_total={len(covered)} ({pct(len(covered))})")
     if not read_trace_path.is_file():
         print(f"[rom_map] note: read trace not found, assets layer empty ({read_trace_path})")
     return 0

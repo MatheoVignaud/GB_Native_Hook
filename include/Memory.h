@@ -246,6 +246,8 @@ void memory_set_logging(bool enabled);
 void memory_set_button_state(MemoryState *mem, JoypadInput input, bool pressed);
 void memory_set_save_path_hint(MemoryState *mem, const char *rom_path);
 void memory_flush_rom_read_trace(void);
+size_t memory_get_rom_read_unique_count(void);
+size_t memory_get_rom_read_track_size(void);
 void memory_set_fetch_patch(uint16_t start, const uint8_t *bytes, uint8_t len);
 void memory_clear_fetch_patch(void);
 

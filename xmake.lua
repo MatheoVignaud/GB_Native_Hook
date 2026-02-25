@@ -8,6 +8,7 @@ target("GB_Native_Hook")
     add_files("src/*.c", "src/*.cpp")
     add_includedirs("include", "libs/ViruaPPU/include")
     add_packages("libsdl3")
+    add_cflags("-O3")
     if is_host("windows") then
         set_toolchains("mingw")
     end

@@ -40,6 +40,12 @@ typedef struct
     bool display_enabled;
     bool auto_recomp;
     bool static_recomp;
+    bool show_help;
+    bool auto_recomp_random;
+    bool auto_recomp_cascade;
+    bool auto_recomp_force_display;
+    uint32_t auto_recomp_random_frames;
+    const char *static_recomp_dump_dir;
 } AppOptions;
 
 typedef struct
@@ -109,6 +115,34 @@ typedef struct
     size_t split_key_count;
     size_t split_key_cap;
 } AutoRecompState;
+
+static bool file_exists_local(const char *path)
+{
+    if (!path || path[0] == '\0')
+        return false;
+    FILE *f = fopen(path, "rb");
+    if (!f)
+        return false;
+    fclose(f);
+    return true;
+}
+
+static bool set_env_local(const char *name, const char *value, bool overwrite)
+{
+    if (!name || name[0] == '\0' || !value)
+        return false;
+    if (!overwrite)
+    {
+        const char *cur = getenv(name);
+        if (cur && cur[0] != '\0')
+            return true;
+    }
+#if defined(_WIN32)
+    return _putenv_s(name, value) == 0;
+#else
+    return setenv(name, value, overwrite ? 1 : 0) == 0;
+#endif
+}
 
 static bool read_env_enabled(const char *name)
 {
@@ -620,6 +654,33 @@ static void auto_recomp_apply_mask(MemoryState *memory, AutoRecompState *auto_re
     auto_recomp->current_mask = next_mask;
 }
 
+static uint8_t auto_recomp_mask_from_memory(const MemoryState *memory)
+{
+    if (!memory)
+        return 0u;
+
+    uint8_t mask = 0u;
+    if ((memory->joypad_dpad & 0x01u) == 0u)
+        mask |= (uint8_t)(1u << JOYPAD_RIGHT);
+    if ((memory->joypad_dpad & 0x02u) == 0u)
+        mask |= (uint8_t)(1u << JOYPAD_LEFT);
+    if ((memory->joypad_dpad & 0x04u) == 0u)
+        mask |= (uint8_t)(1u << JOYPAD_UP);
+    if ((memory->joypad_dpad & 0x08u) == 0u)
+        mask |= (uint8_t)(1u << JOYPAD_DOWN);
+
+    if ((memory->joypad_buttons & 0x01u) == 0u)
+        mask |= (uint8_t)(1u << JOYPAD_A);
+    if ((memory->joypad_buttons & 0x02u) == 0u)
+        mask |= (uint8_t)(1u << JOYPAD_B);
+    if ((memory->joypad_buttons & 0x04u) == 0u)
+        mask |= (uint8_t)(1u << JOYPAD_SELECT);
+    if ((memory->joypad_buttons & 0x08u) == 0u)
+        mask |= (uint8_t)(1u << JOYPAD_START);
+
+    return mask;
+}
+
 static bool auto_recomp_enqueue_alt_path(AutoRecompState *auto_recomp,
                                          CPUState *cpu,
                                          PPUState *ppu,
@@ -906,6 +967,186 @@ static void auto_recomp_step_inputs(AutoRecompState *auto_recomp, MemoryState *m
     auto_recomp_apply_mask(memory, auto_recomp, next_mask);
 }
 
+static size_t auto_cascade_build_input_candidates(uint64_t total_frames, uint8_t *out_masks, size_t out_cap)
+{
+    if (!out_masks || out_cap == 0)
+        return 0;
+
+    const uint8_t M_RIGHT = (uint8_t)(1u << JOYPAD_RIGHT);
+    const uint8_t M_LEFT = (uint8_t)(1u << JOYPAD_LEFT);
+    const uint8_t M_UP = (uint8_t)(1u << JOYPAD_UP);
+    const uint8_t M_DOWN = (uint8_t)(1u << JOYPAD_DOWN);
+    const uint8_t M_A = (uint8_t)(1u << JOYPAD_A);
+    const uint8_t M_B = (uint8_t)(1u << JOYPAD_B);
+    const uint8_t M_SELECT = (uint8_t)(1u << JOYPAD_SELECT);
+    const uint8_t M_START = (uint8_t)(1u << JOYPAD_START);
+
+    uint8_t preferred = 0u;
+    if ((total_frames >= 90u && total_frames < 150u) ||
+        (total_frames >= 210u && total_frames < 270u) ||
+        (total_frames >= 420u && total_frames < 480u))
+    {
+        preferred = M_START;
+    }
+    else if ((total_frames >= 300u && total_frames < 336u) ||
+             (total_frames >= 520u && total_frames < 556u))
+    {
+        preferred = M_A;
+    }
+
+    const uint8_t base_masks[] = {
+        0u,
+        M_START,
+        M_A,
+        M_B,
+        M_UP,
+        M_DOWN,
+        M_LEFT,
+        M_RIGHT,
+        M_SELECT,
+        (uint8_t)(M_A | M_B),
+        (uint8_t)(M_A | M_START),
+        (uint8_t)(M_DOWN | M_A),
+        (uint8_t)(M_UP | M_A),
+    };
+
+    size_t count = 0;
+    if (preferred != 0u)
+    {
+        out_masks[count++] = preferred;
+        if (count >= out_cap)
+            return count;
+    }
+
+    for (size_t i = 0; i < (sizeof(base_masks) / sizeof(base_masks[0])); ++i)
+    {
+        uint8_t m = base_masks[i];
+        bool dup = false;
+        for (size_t j = 0; j < count; ++j)
+        {
+            if (out_masks[j] == m)
+            {
+                dup = true;
+                break;
+            }
+        }
+        if (dup)
+            continue;
+        out_masks[count++] = m;
+        if (count >= out_cap)
+            break;
+    }
+    return count;
+}
+
+static size_t auto_cascade_enqueue_input_variants(AutoRecompState *auto_recomp,
+                                                  CPUState *cpu,
+                                                  PPUState *ppu,
+                                                  MemoryState *memory,
+                                                  const uint8_t *masks,
+                                                  size_t mask_count,
+                                                  size_t primary_index,
+                                                  uint32_t max_alt_variants)
+{
+    if (!auto_recomp || !cpu || !ppu || !memory || !masks || mask_count == 0 || max_alt_variants == 0u)
+        return 0;
+    if (!auto_recomp->enabled || !auto_recomp->heuristic_enabled)
+        return 0;
+    if (auto_recomp->snapshot_count >= auto_recomp->max_clones)
+        return 0;
+
+    AutoPathSnapshot base;
+    if (!auto_snapshot_capture(&base, cpu, ppu, memory))
+        return 0;
+
+    const uint8_t original_mask = auto_recomp->current_mask;
+    size_t enqueued = 0;
+
+    for (size_t step = 1; step < mask_count && enqueued < (size_t)max_alt_variants; ++step)
+    {
+        size_t idx = (primary_index + step) % mask_count;
+        uint8_t mask = masks[idx];
+
+        auto_snapshot_restore(&base, cpu, ppu, memory);
+        auto_recomp->current_mask = original_mask;
+        auto_recomp_apply_mask(memory, auto_recomp, mask);
+
+        AutoPathSnapshot snap;
+        if (!auto_snapshot_capture(&snap, cpu, ppu, memory))
+            continue;
+        if (auto_recomp_push_snapshot(auto_recomp, &snap))
+        {
+            enqueued++;
+        }
+    }
+
+    auto_snapshot_restore(&base, cpu, ppu, memory);
+    auto_recomp->current_mask = original_mask;
+    auto_snapshot_free(&base);
+    return enqueued;
+}
+
+static void auto_cascade_step_inputs(AutoRecompState *auto_recomp,
+                                     CPUState *cpu,
+                                     PPUState *ppu,
+                                     MemoryState *memory,
+                                     uint32_t decision_period_frames,
+                                     uint32_t hold_frames,
+                                     uint32_t alt_variants_per_decision)
+{
+    if (!auto_recomp || !cpu || !ppu || !memory || !auto_recomp->enabled || !auto_recomp->heuristic_enabled)
+        return;
+
+    if (decision_period_frames == 0u)
+        decision_period_frames = 1u;
+    if (hold_frames == 0u)
+        hold_frames = 1u;
+    if (hold_frames > decision_period_frames)
+        hold_frames = decision_period_frames;
+
+    uint8_t candidate_masks[16];
+    size_t candidate_count = auto_cascade_build_input_candidates(auto_recomp->total_frames, candidate_masks, 16u);
+    if (candidate_count == 0u)
+    {
+        auto_recomp_apply_mask(memory, auto_recomp, 0u);
+        return;
+    }
+
+    bool decision_frame = ((auto_recomp->total_frames % (uint64_t)decision_period_frames) == 0u);
+    if (decision_frame)
+    {
+        uint64_t decision_index = (auto_recomp->total_frames / (uint64_t)decision_period_frames) + auto_recomp->paths_completed;
+        size_t primary_index = (size_t)(decision_index % (uint64_t)candidate_count);
+
+        if (alt_variants_per_decision > 0u)
+        {
+            (void)auto_cascade_enqueue_input_variants(auto_recomp,
+                                                      cpu,
+                                                      ppu,
+                                                      memory,
+                                                      candidate_masks,
+                                                      candidate_count,
+                                                      primary_index,
+                                                      alt_variants_per_decision);
+        }
+
+        auto_recomp->hold_frames_left = hold_frames;
+        auto_recomp_apply_mask(memory, auto_recomp, candidate_masks[primary_index]);
+        return;
+    }
+
+    if (auto_recomp->hold_frames_left > 1u)
+    {
+        auto_recomp->hold_frames_left--;
+        auto_recomp_apply_mask(memory, auto_recomp, auto_recomp->current_mask);
+    }
+    else
+    {
+        auto_recomp->hold_frames_left = 0u;
+        auto_recomp_apply_mask(memory, auto_recomp, 0u);
+    }
+}
+
 static void auto_recomp_on_progress(AutoRecompState *auto_recomp, size_t discovered_count)
 {
     if (!auto_recomp || !auto_recomp->enabled)
@@ -984,6 +1225,47 @@ static void print_updating_status_line(uint64_t elapsed_seconds,
     *last_line_len = len;
 }
 
+static void print_cascade_progress_log(uint64_t elapsed_seconds,
+                                       const AutoRecompState *auto_recomp,
+                                       const MemoryState *memory)
+{
+    if (!auto_recomp || !auto_recomp->enabled || !memory)
+        return;
+
+    RecompProbeStats stats = {0};
+    recomp_probe_get_stats(&stats);
+
+    size_t rom_reads = memory_get_rom_read_unique_count();
+    size_t rom_size = memory_get_rom_read_track_size();
+    double rom_reads_pct = (rom_size > 0) ? (100.0 * (double)rom_reads / (double)rom_size) : 0.0;
+
+    size_t dyn_unique_pcs = recomp_probe_dyn_dump_unique_starts_count();
+    uint64_t dyn_dumps = recomp_probe_dyn_dump_count();
+
+    char tbuf[32];
+    format_elapsed_hms(elapsed_seconds, tbuf, sizeof(tbuf));
+
+    printf("[AUTO-CASCADE] t=%s funcs=%zu proc=%zu branches=%zu paths=%zu rom_reads=%zu/%zu(%.2f%%) dyn_pcs=%zu dyn_dumps=%llu queued=%zu spawned=%llu done=%llu splits=%llu path_steps=%u total_steps=%llu frames=%llu\n",
+           tbuf,
+           stats.functions_discovered,
+           stats.functions_processed,
+           stats.branches_discovered,
+           stats.paths_discovered,
+           rom_reads,
+           rom_size,
+           rom_reads_pct,
+           dyn_unique_pcs,
+           (unsigned long long)dyn_dumps,
+           auto_recomp->snapshot_count,
+           (unsigned long long)auto_recomp->paths_spawned,
+           (unsigned long long)auto_recomp->paths_completed,
+           (unsigned long long)auto_recomp->branch_splits,
+           auto_recomp->path_step_budget,
+           (unsigned long long)auto_recomp->total_path_steps,
+           (unsigned long long)auto_recomp->total_frames);
+    fflush(stdout);
+}
+
 static bool auto_recomp_should_restart(const AutoRecompState *auto_recomp, const char **reason)
 {
     if (!auto_recomp || !auto_recomp->enabled)
@@ -1026,6 +1308,8 @@ static bool auto_recomp_switch_to_next_path(AutoRecompState *auto_recomp,
     auto_snapshot_free(&snapshot);
     auto_recomp->paths_completed++;
     auto_recomp->current_path_steps = 0;
+    auto_recomp->current_mask = auto_recomp_mask_from_memory(memory);
+    auto_recomp->hold_frames_left = 0u;
     return true;
 }
 
@@ -1278,16 +1562,96 @@ static bool reset_runtime_state(const char *rom_path, MemoryState *memory, CPUSt
     return true;
 }
 
+static bool seed_static_recomp_from_dump_dir(const char *dump_dir,
+                                             size_t *out_candidates,
+                                             size_t *out_seeded_increase)
+{
+    if (out_candidates)
+        *out_candidates = 0;
+    if (out_seeded_increase)
+        *out_seeded_increase = 0;
+    if (!dump_dir || dump_dir[0] == '\0')
+        return false;
+
+    DIR *dir = opendir(dump_dir);
+    if (!dir)
+        return false;
+
+    size_t before = recomp_probe_discovered_count();
+    size_t candidates = 0;
+    struct dirent *ent = NULL;
+    while ((ent = readdir(dir)) != NULL)
+    {
+        const char *name = ent->d_name;
+        if (!name || name[0] == '\0')
+            continue;
+
+        unsigned bank = 0;
+        unsigned addr = 0;
+        int nconsumed = 0;
+        if (sscanf(name, "func_b%u_%x.json%n", &bank, &addr, &nconsumed) == 2 &&
+            nconsumed > 0 &&
+            name[nconsumed] == '\0' &&
+            addr < 0x8000u)
+        {
+            recomp_probe_seed_entry_bank((size_t)bank, (uint16_t)addr);
+            candidates++;
+        }
+    }
+    closedir(dir);
+
+    if (out_candidates)
+        *out_candidates = candidates;
+    if (out_seeded_increase)
+    {
+        size_t after = recomp_probe_discovered_count();
+        *out_seeded_increase = (after >= before) ? (after - before) : 0;
+    }
+    return true;
+}
+
+static void print_usage(const char *argv0)
+{
+    const char *prog = (argv0 && argv0[0] != '\0') ? argv0 : "GB_Native_Hook";
+    printf("Usage: %s [options] [rom_path]\n", prog);
+    printf("\n");
+    printf("Options:\n");
+    printf("  -h, --help       Show this help and exit\n");
+    printf("  --display        Enable SDL display window (default)\n");
+    printf("  --no-display     Disable SDL display window\n");
+    printf("  --auto-recomp    Run auto-recomp exploration mode\n");
+    printf("  --auto-recomp-cascade  Algorithmic branch/snapshot exploration with long-run coverage logging\n");
+    printf("  --auto-recomp-random  Run auto-recomp in random-input mode (heuristic off)\n");
+    printf("  --auto-recomp-random-frames <n>  Random-input duration in frames (also sets max_scenarios=1)\n");
+    printf("  --auto-recomp-display  Keep display enabled during auto/static recomp (CLI override)\n");
+    printf("  --static-recomp  Run static reachability analysis and exit\n");
+    printf("  --static-recomp-from-dumps <dir>  Seed static walk from func_bXXX_YYYY.json in <dir>\n");
+    printf("\n");
+    printf("Notes:\n");
+    printf("  - If no ROM is provided, defaults to Pokemon.gb\n");
+    printf("  - Some behavior can be controlled with env vars (GB_AUTO_RECOMP_*, GB_STATIC_RECOMP, etc.)\n");
+}
+
 static const char *parse_arguments(int argc, char **argv, AppOptions *options)
 {
     const char *rom_path = NULL;
     options->display_enabled = true;
     options->auto_recomp = false;
     options->static_recomp = false;
+    options->show_help = false;
+    options->auto_recomp_random = false;
+    options->auto_recomp_cascade = false;
+    options->auto_recomp_force_display = false;
+    options->auto_recomp_random_frames = 0;
+    options->static_recomp_dump_dir = NULL;
 
     for (int i = 1; i < argc; ++i)
     {
-        if (strcmp(argv[i], "--no-display") == 0)
+        if (strcmp(argv[i], "-h") == 0 || strcmp(argv[i], "--help") == 0)
+        {
+            options->show_help = true;
+        }
+        else if (strcmp(argv[i], "--no-display") == 0)
         {
             options->display_enabled = false;
         }
@@ -1299,9 +1663,43 @@ static const char *parse_arguments(int argc, char **argv, AppOptions *options)
         {
             options->auto_recomp = true;
         }
+        else if (strcmp(argv[i], "--auto-recomp-cascade") == 0)
+        {
+            options->auto_recomp = true;
+            options->auto_recomp_cascade = true;
+        }
+        else if (strcmp(argv[i], "--auto-recomp-random") == 0)
+        {
+            options->auto_recomp = true;
+            options->auto_recomp_random = true;
+        }
+        else if (strcmp(argv[i], "--auto-recomp-random-frames") == 0 && (i + 1) < argc)
+        {
+            unsigned long v = strtoul(argv[++i], NULL, 10);
+            if (v == 0 || v > 0xFFFFFFFFul)
+            {
+                fprintf(stderr, "Invalid value for --auto-recomp-random-frames: %s\n", argv[i]);
+            }
+            else
+            {
+                options->auto_recomp = true;
+                options->auto_recomp_random = true;
+                options->auto_recomp_random_frames = (uint32_t)v;
+            }
+        }
+        else if (strcmp(argv[i], "--auto-recomp-display") == 0)
+        {
+            options->display_enabled = true;
+            options->auto_recomp_force_display = true;
+        }
         else if (strcmp(argv[i], "--static-recomp") == 0)
         {
             options->static_recomp = true;
+        }
+        else if (strcmp(argv[i], "--static-recomp-from-dumps") == 0 && (i + 1) < argc)
+        {
+            options->static_recomp = true;
+            options->static_recomp_dump_dir = argv[++i];
         }
         else if (argv[i][0] == '-')
         {
@@ -1318,11 +1716,58 @@ static const char *parse_arguments(int argc, char **argv, AppOptions *options)
 
 int main(int argc, char **argv)
 {
+    AppOptions options = {0};
+    const char *rom_path = parse_arguments(argc, argv, &options);
+    if (options.show_help)
+    {
+        print_usage(argc > 0 ? argv[0] : "GB_Native_Hook");
+        return 0;
+    }
+
+    bool auto_recomp_cascade_requested = options.auto_recomp_cascade;
+    bool auto_recomp_random_requested = options.auto_recomp_random;
+    char auto_recomp_cascade_seed_dir[512] = {0};
+    char auto_recomp_cascade_trace_path[512] = {0};
+    char auto_recomp_random_trace_path[512] = {0};
+    if (auto_recomp_cascade_requested || auto_recomp_random_requested)
+    {
+        const char *candidate_rom = rom_path;
+        if (!candidate_rom || candidate_rom[0] == '\0' || !file_exists_local(candidate_rom))
+        {
+            candidate_rom = "Pokemon.gb";
+        }
+
+        char stem[260] = {0};
+        path_to_stem_local(candidate_rom, stem, sizeof(stem));
+        if (stem[0] != '\0')
+        {
+            (void)ensure_dir_if_needed(stem);
+            if (auto_recomp_cascade_requested)
+            {
+                snprintf(auto_recomp_cascade_seed_dir, sizeof(auto_recomp_cascade_seed_dir), "%s", stem);
+                snprintf(auto_recomp_cascade_trace_path, sizeof(auto_recomp_cascade_trace_path), "%s/rom_reads.txt", stem);
+                (void)set_env_local("GB_ROM_READ_TRACE_PATH", auto_recomp_cascade_trace_path, false);
+            }
+            if (auto_recomp_random_requested)
+            {
+                snprintf(auto_recomp_random_trace_path, sizeof(auto_recomp_random_trace_path), "%s/rom_reads.txt", stem);
+                (void)set_env_local("GB_ROM_READ_TRACE_PATH", auto_recomp_random_trace_path, false);
+            }
+        }
+
+        if (auto_recomp_cascade_requested)
+        {
+            (void)set_env_local("GB_RECOMP_PROBE", "1", false);
+            (void)set_env_local("GB_RECOMP_INPUT_PROFILE", "1", false);
+            (void)set_env_local("GB_RECOMP_INPUT_SNAPSHOTS", "1", false);
+            (void)set_env_local("GB_RECOMP_INPUT_SAMPLES_MAX", "16", false);
+            (void)set_env_local("GB_RECOMP_NO_DOT", "1", false);
+        }
+    }
+
     MemoryState memory;
     memory_init(&memory);
 
-    AppOptions options = {0};
-    const char *rom_path = parse_arguments(argc, argv, &options);
     if (read_env_enabled("GB_STATIC_RECOMP"))
     {
         options.static_recomp = true;
@@ -1335,7 +1780,9 @@ int main(int argc, char **argv)
     {
         options.auto_recomp = false;
     }
-    if ((options.auto_recomp || options.static_recomp) && !read_env_enabled("GB_AUTO_RECOMP_DISPLAY"))
+    if ((options.auto_recomp || options.static_recomp) &&
+        !options.auto_recomp_force_display &&
+        !read_env_enabled("GB_AUTO_RECOMP_DISPLAY"))
     {
         options.display_enabled = false;
     }
@@ -1390,14 +1837,76 @@ int main(int argc, char **argv)
     PPUState ppu = {0};
     recomp_probe_set_logging(!quiet_auto_recomp_logs);
     recomp_probe_init(loaded_rom, &memory);
+    recomp_probe_dyn_dump_init(loaded_rom, &memory);
     cpu.memory = &memory;
     memory.cpu = &cpu;
     ppu.mem = &memory.memory;
     cpu_reset(&cpu);
     ppu_reset(&ppu, memory.bios_enabled);
 
+    if (options.auto_recomp_cascade && !options.static_recomp)
+    {
+        char stem[260] = {0};
+        path_to_stem_local(loaded_rom, stem, sizeof(stem));
+        if (stem[0] != '\0')
+        {
+            snprintf(auto_recomp_cascade_seed_dir, sizeof(auto_recomp_cascade_seed_dir), "%s", stem);
+        }
+
+        uint64_t static_t0 = SDL_GetPerformanceCounter();
+        size_t seed_candidates = 0;
+        size_t seed_new = 0;
+        bool seed_ok = false;
+        if (auto_recomp_cascade_seed_dir[0] != '\0')
+        {
+            seed_ok = seed_static_recomp_from_dump_dir(auto_recomp_cascade_seed_dir, &seed_candidates, &seed_new);
+        }
+        if (seed_ok)
+        {
+            printf("[AUTO-CASCADE] static seed from dumps dir=%s candidates=%zu new=%zu\n",
+                   auto_recomp_cascade_seed_dir,
+                   seed_candidates,
+                   seed_new);
+        }
+        else if (auto_recomp_cascade_seed_dir[0] != '\0')
+        {
+            printf("[AUTO-CASCADE] no dump seed dir found (expected %s), continuing without seed\n",
+                   auto_recomp_cascade_seed_dir);
+        }
+
+        recomp_probe_run_static_reachability(cpu.PC, true, true);
+        uint64_t static_t1 = SDL_GetPerformanceCounter();
+        uint64_t pf = SDL_GetPerformanceFrequency();
+        if (pf == 0)
+            pf = 1;
+        RecompProbeStats pre_stats = {0};
+        recomp_probe_get_stats(&pre_stats);
+        printf("[AUTO-CASCADE] static prepass done dt=%.2fs funcs=%zu branches=%zu paths=%zu\n",
+               (double)(static_t1 - static_t0) / (double)pf,
+               pre_stats.functions_discovered,
+               pre_stats.branches_discovered,
+               pre_stats.paths_discovered);
+    }
+
     if (options.static_recomp)
     {
+        if (options.static_recomp_dump_dir && options.static_recomp_dump_dir[0] != '\0')
+        {
+            size_t seed_candidates = 0;
+            size_t seed_increase = 0;
+            if (!seed_static_recomp_from_dump_dir(options.static_recomp_dump_dir, &seed_candidates, &seed_increase))
+            {
+                fprintf(stderr, "[STATIC-RECOMP] failed to open dump dir: %s\n", options.static_recomp_dump_dir);
+            }
+            else
+            {
+                printf("[STATIC-RECOMP] seeded from dumps dir=%s candidates=%zu new=%zu\n",
+                       options.static_recomp_dump_dir,
+                       seed_candidates,
+                       seed_increase);
+            }
+        }
+
         uint64_t perf_freq = SDL_GetPerformanceFrequency();
         if (perf_freq == 0)
             perf_freq = 1;
@@ -1437,9 +1946,52 @@ int main(int argc, char **argv)
         .texture = NULL};
 
     display_init(&display);
+    if ((options.auto_recomp_cascade || options.auto_recomp_random) && display.enabled && display.renderer)
+    {
+        (void)SDL_SetRenderVSync(display.renderer, false);
+    }
 
     AutoRecompState auto_recomp = {0};
+    uint32_t auto_cascade_warmup_frames = 0u;
+    uint32_t auto_cascade_input_decision_period_frames = 12u;
+    uint32_t auto_cascade_input_hold_frames = 4u;
+    uint32_t auto_cascade_input_alt_variants = 2u;
     auto_recomp_init(&auto_recomp, options.auto_recomp);
+    if (auto_recomp.enabled && options.auto_recomp_random)
+    {
+        auto_recomp.heuristic_enabled = false;
+        if (options.auto_recomp_random_frames > 0)
+        {
+            auto_recomp.frames_per_scenario = options.auto_recomp_random_frames;
+            auto_recomp.max_scenarios = 1u;
+            auto_recomp.stagnation_frames = 0u; // honor explicit duration unless max_scenarios/env says otherwise
+        }
+    }
+    if (auto_recomp.enabled && options.auto_recomp_cascade)
+    {
+        auto_recomp.heuristic_enabled = true;
+        auto_recomp.total_step_budget = 0u; // cascade mode is intended for multi-hour/day runs
+        {
+            uint32_t cascade_path_steps = read_env_u32("GB_AUTO_CASCADE_PATH_STEPS", 10000000u);
+            uint32_t cascade_max_clones = read_env_u32("GB_AUTO_CASCADE_MAX_CLONES", 512u);
+            auto_cascade_warmup_frames = read_env_u32("GB_AUTO_CASCADE_WARMUP_FRAMES", 1200u);
+            auto_cascade_input_decision_period_frames = read_env_u32("GB_AUTO_CASCADE_INPUT_PERIOD_FRAMES", 12u);
+            auto_cascade_input_hold_frames = read_env_u32("GB_AUTO_CASCADE_INPUT_HOLD_FRAMES", 4u);
+            auto_cascade_input_alt_variants = read_env_u32("GB_AUTO_CASCADE_INPUT_ALT_VARIANTS", 2u);
+            if (cascade_path_steps > 0u)
+            {
+                auto_recomp.path_step_budget = cascade_path_steps;
+            }
+            if (cascade_max_clones > auto_recomp.max_clones)
+            {
+                auto_recomp.max_clones = cascade_max_clones;
+            }
+            if (auto_cascade_input_decision_period_frames == 0u)
+                auto_cascade_input_decision_period_frames = 1u;
+            if (auto_cascade_input_hold_frames == 0u)
+                auto_cascade_input_hold_frames = 1u;
+        }
+    }
     if (auto_recomp.enabled)
     {
         auto_recomp.last_seen_count = recomp_probe_discovered_count();
@@ -1457,6 +2009,25 @@ int main(int argc, char **argv)
                    auto_recomp.max_scenarios,
                    (unsigned long long)auto_recomp.rng,
                    seeded_snapshots);
+            if (options.auto_recomp_random)
+            {
+                printf("[AUTO-RECOMP] random-input mode enabled frames_per_scenario=%u max_scenarios=%u display=%s\n",
+                       auto_recomp.frames_per_scenario,
+                       auto_recomp.max_scenarios,
+                       display.enabled ? "on" : "off");
+            }
+        }
+        if (options.auto_recomp_cascade)
+        {
+            printf("[AUTO-CASCADE] mode=algorithmic-tree random_inputs=off total_limit=unlimited path_steps=%u warmup_frames=%u max_clones=%u input_period=%u input_hold=%u input_alt=%u display=%s trace=%s\n",
+                   auto_recomp.path_step_budget,
+                   auto_cascade_warmup_frames,
+                   auto_recomp.max_clones,
+                   auto_cascade_input_decision_period_frames,
+                   auto_cascade_input_hold_frames,
+                   auto_cascade_input_alt_variants,
+                   display.enabled ? "on" : "off",
+                   auto_recomp_cascade_trace_path[0] ? auto_recomp_cascade_trace_path : "(env/default)");
         }
     }
 
@@ -1476,6 +2047,9 @@ int main(int argc, char **argv)
     {
         perf_freq = 1;
     }
+    uint64_t auto_recomp_status_interval_ticks = options.auto_recomp_cascade ? (perf_freq * 2u) : perf_freq;
+    if (auto_recomp_status_interval_ticks == 0)
+        auto_recomp_status_interval_ticks = 1;
     uint64_t fps_diag_interval_ticks = (uint64_t)((double)perf_freq * fps_diag_interval_s);
     if (fps_diag_interval_ticks == 0)
     {
@@ -1521,6 +2095,12 @@ int main(int argc, char **argv)
 
             bool total_budget_hit = auto_recomp.total_step_budget > 0 && auto_recomp.total_path_steps >= auto_recomp.total_step_budget;
             bool path_budget_hit = auto_recomp.path_step_budget > 0 && auto_recomp.current_path_steps >= auto_recomp.path_step_budget;
+            if (options.auto_recomp_cascade &&
+                auto_cascade_warmup_frames > 0u &&
+                auto_recomp.total_frames < (uint64_t)auto_cascade_warmup_frames)
+            {
+                path_budget_hit = false;
+            }
             if (total_budget_hit || path_budget_hit)
             {
                 if (!auto_recomp_switch_to_next_path(&auto_recomp, &cpu, &ppu, &memory))
@@ -1595,6 +2175,16 @@ int main(int argc, char **argv)
                 if (auto_recomp.heuristic_enabled)
                 {
                     auto_recomp.total_frames++;
+                    if (options.auto_recomp_cascade)
+                    {
+                        auto_cascade_step_inputs(&auto_recomp,
+                                                 &cpu,
+                                                 &ppu,
+                                                 &memory,
+                                                 auto_cascade_input_decision_period_frames,
+                                                 auto_cascade_input_hold_frames,
+                                                 auto_cascade_input_alt_variants);
+                    }
                 }
                 else
                 {
@@ -1694,10 +2284,27 @@ int main(int argc, char **argv)
         if (auto_recomp.enabled)
         {
             uint64_t now = SDL_GetPerformanceCounter();
-            if ((now - status_last_tick) >= perf_freq)
+            if ((now - status_last_tick) >= auto_recomp_status_interval_ticks)
             {
                 uint64_t elapsed_seconds = (now - run_start_tick) / perf_freq;
-                print_updating_status_line(elapsed_seconds, &auto_recomp, &status_line_len);
+                if (options.auto_recomp_cascade)
+                {
+                    if (status_line_len > 0)
+                    {
+                        printf("\n");
+                        status_line_len = 0;
+                    }
+                    print_cascade_progress_log(elapsed_seconds, &auto_recomp, &memory);
+                    memory_flush_rom_read_trace();
+                }
+                else
+                {
+                    print_updating_status_line(elapsed_seconds, &auto_recomp, &status_line_len);
+                    if (options.auto_recomp_random)
+                    {
+                        memory_flush_rom_read_trace();
+                    }
+                }
                 status_last_tick = now;
             }
         }

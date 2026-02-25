@@ -184,6 +184,7 @@ typedef struct
     char output_dir[512];
     uint8_t dumped_start[8192];
     uint32_t dumped_sig[65536];
+    uint64_t dump_count;
 } DynDumpState;
 static DynDumpState g_dyn_dump = {0};
 
@@ -1461,6 +1462,7 @@ void recomp_probe_dyn_dump_init(const char *rom_path, MemoryState *mem)
 
     memset(g_dyn_dump.dumped_start, 0, sizeof(g_dyn_dump.dumped_start));
     memset(g_dyn_dump.dumped_sig, 0, sizeof(g_dyn_dump.dumped_sig));
+    g_dyn_dump.dump_count = 0u;
     g_dyn_dump.enabled = true;
 }
 
@@ -1519,11 +1521,32 @@ void recomp_probe_dyn_dump_code(CPUState *cpu, uint16_t pc, const char *reason)
     }
 
     fclose(f);
+    g_dyn_dump.dump_count++;
 }
 
 uint32_t recomp_probe_dyn_body_hash(CPUState *cpu, uint16_t pc)
 {
     return dyn_dump_sig_window(cpu, pc);
+}
+
+size_t recomp_probe_dyn_dump_unique_starts_count(void)
+{
+    size_t count = 0;
+    for (size_t i = 0; i < sizeof(g_dyn_dump.dumped_start); ++i)
+    {
+        uint8_t v = g_dyn_dump.dumped_start[i];
+        while (v)
+        {
+            v &= (uint8_t)(v - 1u);
+            count++;
+        }
+    }
+    return count;
+}
+
+uint64_t recomp_probe_dyn_dump_count(void)
+{
+    return g_dyn_dump.dump_count;
 }
 
 static bool seen_has(size_t bank, uint16_t addr)
@@ -2740,6 +2763,11 @@ void recomp_probe_seed_entry(CPUState *cpu, uint16_t pc)
         probe_exec_stack_push(k);
         probe_exec_sample_start(cpu, k);
     }
+}
+
+void recomp_probe_seed_entry_bank(size_t bank, uint16_t pc)
+{
+    discover_function(bank, pc, "ENTRY_SEED");
 }
 
 void recomp_probe_on_interrupt(CPUState *cpu, uint16_t vector)
