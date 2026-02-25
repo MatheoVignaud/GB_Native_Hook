@@ -647,7 +647,7 @@ def main() -> int:
             codegen_cmd.extend(["--read-trace", read_trace_path])
 
     run_checked(codegen_cmd, repo_root)
-    run_checked(["xmake", "build", args.target], repo_root)
+    run_checked(["xmake", "build" , "-j4", args.target], repo_root)
     show_out = run_checked(["xmake", "show", "-t", args.target], repo_root)
 
     targetfile_raw = parse_targetfile(show_out)
@@ -675,7 +675,7 @@ def main() -> int:
     try:
         refine_run_instr = max(1, int(args.refine_run_instr))
     except ValueError:
-        refine_run_instr = 300000
+        refine_run_instr = 3000000
 
     if not refine_enabled or refine_rounds <= 0:
         return 0
@@ -776,7 +776,7 @@ def main() -> int:
                 codegen_cmd.extend(["--read-trace", read_trace_path])
 
         run_checked(codegen_cmd, repo_root)
-        run_checked(["xmake", "build", args.target], repo_root)
+        run_checked(["xmake", "build", "-j4" , args.target], repo_root)
         show_out = run_checked(["xmake", "show", "-t", args.target], repo_root)
         targetfile_raw = parse_targetfile(show_out)
         targetfile = ensure_path(repo_root, targetfile_raw)
