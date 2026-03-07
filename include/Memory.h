@@ -233,6 +233,7 @@ typedef struct
     uint8_t joypad_buttons; // Lower nibble, 1 = released
     uint8_t joypad_dpad;    // Lower nibble, 1 = released
     uint8_t joypad_select;  // Bits 4/5 selection latch
+    uint64_t joypad_read_count;
 } MemoryState;
 
 int load_rom(const char *path, MemoryState *mem);
@@ -248,6 +249,8 @@ void memory_set_save_path_hint(MemoryState *mem, const char *rom_path);
 void memory_flush_rom_read_trace(void);
 size_t memory_get_rom_read_unique_count(void);
 size_t memory_get_rom_read_track_size(void);
+size_t memory_get_rom_data_read_unique_count(void);
+uint64_t memory_get_joypad_read_count(const MemoryState *mem);
 void memory_set_fetch_patch(uint16_t start, const uint8_t *bytes, uint8_t len);
 void memory_clear_fetch_patch(void);
 

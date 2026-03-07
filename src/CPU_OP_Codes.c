@@ -1,5 +1,4 @@
 #include "CPU_OP_Codes.h"
-#include "RecompProbe.h"
 
 #include <stdlib.h>
 
@@ -27,14 +26,11 @@ void cpu_illegal_opcode(CPUState *cpu, uint8_t opcode)
 {
     uint16_t op_pc = cpu ? (uint16_t)(cpu->PC - 1u) : 0u;
 
-    if (cpu && op_pc >= 0x8000u)
-        recomp_probe_dyn_dump_code(cpu, op_pc, "ILLEGAL_OPCODE");
-
     fprintf(stderr, "Opcode 0x%02X invalid/unimplemented at PC: 0x%04X\n", opcode, op_pc);
 
     if (cpu && cpu_illegal_opcode_softfail_enabled())
     {
-        fprintf(stderr, "[CPU] softfail illegal opcode -> NOP (GB_ILLEGAL_OPCODE_NOP / recompiled fallback)\n");
+        fprintf(stderr, "[CPU] softfail illegal opcode -> NOP\n");
         nop(cpu);
         return;
     }

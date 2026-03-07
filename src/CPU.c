@@ -1,5 +1,4 @@
 #include "CPU.h"
-#include "RecompProbe.h"
 
 #include <stdlib.h>
 
@@ -191,7 +190,6 @@ static uint32_t cpu_service_interrupts(CPUState *cpu)
             memory_write(cpu->memory, --cpu->SP, (uint8_t)((cpu->PC >> 8) & 0xFF));
             memory_write(cpu->memory, --cpu->SP, (uint8_t)(cpu->PC & 0xFF));
             cpu->PC = vectors[i];
-            recomp_probe_on_interrupt(cpu, vectors[i]);
             return 5;
         }
     }
@@ -242,7 +240,6 @@ void cpu_reset(CPUState *cpu)
     cpu->memory->memory.TIMA = 0;
 
     cpu_trace_log(cpu, "RESET");
-    recomp_probe_seed_entry(cpu, cpu->PC);
 }
 
 uint64_t instruction_count = 0;
@@ -363,11 +360,6 @@ uint32_t cpu_decoded_step_begin(CPUState *cpu, uint8_t opcode, CPUDecodedStep *s
     {
         cpu_trace_log(cpu, "EXEC");
     }
-    if (fetch_pc >= 0x8000u)
-    {
-        recomp_probe_dyn_dump_code(cpu, fetch_pc, "EXEC");
-    }
-    recomp_probe_on_instruction(cpu, fetch_pc, opcode);
     cpu->profile_data_reads_active = true;
     return 0;
 }

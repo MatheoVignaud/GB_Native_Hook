@@ -1,6 +1,7 @@
 #include "Memory.h"
 #include "CPU.h"
-#include "RecompProbe.h"
+
+#include <SDL3/SDL.h>
 
 #include <string.h>
 #include <time.h>
@@ -40,6 +41,10 @@ static uint8_t *rom_read_bitmap = NULL;
 static size_t rom_read_bitmap_size = 0;
 static size_t rom_read_track_size = 0;
 static size_t rom_read_unique_count = 0;
+static uint8_t *rom_data_read_bitmap = NULL;
+static size_t rom_data_read_bitmap_size = 0;
+static size_t rom_data_read_unique_count = 0;
+static SDL_Mutex *rom_trace_mutex = NULL;
 
 static uint64_t mbc3_rtc_now_seconds(void);
 static void mbc3_rtc_update(CartridgeState *cart);
@@ -65,6 +70,26 @@ typedef struct
 } FetchPatchState;
 
 static FetchPatchState fetch_patch = {0};
+
+static void rom_trace_lock(void)
+{
+    if (!rom_trace_mutex)
+    {
+        rom_trace_mutex = SDL_CreateMutex();
+    }
+    if (rom_trace_mutex)
+    {
+        SDL_LockMutex(rom_trace_mutex);
+    }
+}
+
+static void rom_trace_unlock(void)
+{
+    if (rom_trace_mutex)
+    {
+        SDL_UnlockMutex(rom_trace_mutex);
+    }
+}
 
 void memory_set_logging(bool enabled)
 {
@@ -97,26 +122,45 @@ void memory_clear_fetch_patch(void)
 
 static void rom_read_trace_reset(size_t rom_size)
 {
+    rom_trace_lock();
     free(rom_read_bitmap);
     rom_read_bitmap = NULL;
     rom_read_bitmap_size = 0;
+    free(rom_data_read_bitmap);
+    rom_data_read_bitmap = NULL;
+    rom_data_read_bitmap_size = 0;
     rom_read_track_size = rom_size;
     rom_read_unique_count = 0;
+    rom_data_read_unique_count = 0;
 
-    if (!rom_read_trace_enabled || rom_size == 0)
-        return;
-
-    rom_read_bitmap_size = (rom_size + 7u) / 8u;
-    rom_read_bitmap = (uint8_t *)calloc(rom_read_bitmap_size, 1);
-    if (!rom_read_bitmap)
+    if (rom_size == 0)
     {
-        rom_read_bitmap_size = 0;
-        rom_read_trace_enabled = false;
-        if (memory_logging_enabled)
+        rom_trace_unlock();
+        return;
+    }
+
+    if (rom_read_trace_enabled)
+    {
+        rom_read_bitmap_size = (rom_size + 7u) / 8u;
+        rom_read_bitmap = (uint8_t *)calloc(rom_read_bitmap_size, 1);
+        if (!rom_read_bitmap)
         {
-            fprintf(stderr, "[ROM-TRACE] failed to allocate bitmap, disabling trace.\n");
+            rom_read_bitmap_size = 0;
+            rom_read_trace_enabled = false;
+            if (memory_logging_enabled)
+            {
+                fprintf(stderr, "[ROM-TRACE] failed to allocate bitmap, disabling trace.\n");
+            }
         }
     }
+
+    rom_data_read_bitmap_size = (rom_size + 7u) / 8u;
+    rom_data_read_bitmap = (uint8_t *)calloc(rom_data_read_bitmap_size, 1);
+    if (!rom_data_read_bitmap)
+    {
+        rom_data_read_bitmap_size = 0;
+    }
+    rom_trace_unlock();
 }
 
 static void rom_read_trace_init(void)
@@ -139,8 +183,12 @@ static void rom_read_trace_init(void)
 
 static void rom_read_trace_mark(size_t absolute)
 {
+    rom_trace_lock();
     if (!rom_read_trace_enabled || !rom_read_bitmap || absolute >= rom_read_track_size)
+    {
+        rom_trace_unlock();
         return;
+    }
 
     size_t byte_index = absolute >> 3u;
     uint8_t mask = (uint8_t)(1u << (absolute & 7u));
@@ -149,16 +197,43 @@ static void rom_read_trace_mark(size_t absolute)
         rom_read_bitmap[byte_index] |= mask;
         rom_read_unique_count++;
     }
+    rom_trace_unlock();
+}
+
+static void rom_data_read_mark(size_t absolute)
+{
+    rom_trace_lock();
+    if (!rom_data_read_bitmap || absolute >= rom_read_track_size)
+    {
+        rom_trace_unlock();
+        return;
+    }
+
+    size_t byte_index = absolute >> 3u;
+    uint8_t mask = (uint8_t)(1u << (absolute & 7u));
+    if ((rom_data_read_bitmap[byte_index] & mask) == 0)
+    {
+        rom_data_read_bitmap[byte_index] |= mask;
+        rom_data_read_unique_count++;
+    }
+    rom_trace_unlock();
 }
 
 static void rom_read_trace_flush(void)
 {
+    rom_trace_lock();
     if (!rom_read_trace_enabled || !rom_read_bitmap || rom_read_trace_path[0] == '\0')
+    {
+        rom_trace_unlock();
         return;
+    }
 
     FILE *f = fopen(rom_read_trace_path, "w");
     if (!f)
+    {
+        rom_trace_unlock();
         return;
+    }
 
     fprintf(f, "# GB ROM read trace\n");
     fprintf(f, "# rom_size=%zu unique_reads=%zu\n", rom_read_track_size, rom_read_unique_count);
@@ -199,6 +274,7 @@ static void rom_read_trace_flush(void)
     {
         printf("[ROM-TRACE] wrote %s (unique=%zu)\n", rom_read_trace_path, rom_read_unique_count);
     }
+    rom_trace_unlock();
 }
 
 static void mbc_trace_init(void)
@@ -794,6 +870,10 @@ static uint8_t cartridge_rom_read(const MemoryState *mem, uint16_t address)
         return 0xFF;
     }
     rom_read_trace_mark(absolute);
+    if (mem->cpu && mem->cpu->profile_data_reads_active)
+    {
+        rom_data_read_mark(absolute);
+    }
     return cart->rom_data[absolute];
 }
 
@@ -1280,6 +1360,7 @@ void memory_init(MemoryState *mem)
     memory_clear_fetch_patch();
     cartridge_reset(&mem->cartridge);
     rom_read_trace_reset(0);
+    mem->joypad_read_count = 0;
     mem->bios_enabled = false;
     mem->joypad_buttons = 0x0F;
     mem->joypad_dpad = 0x0F;
@@ -1421,6 +1502,11 @@ int load_bios(const char *path, uint8_t *bios)
     return 0;
 }
 
+static inline void memory_probe_data_write(MemoryState *mem, uint16_t address, uint8_t value)
+{
+    (void)mem; (void)address; (void)value;
+}
+
 uint8_t memory_read(MemoryState *mem, uint16_t address)
 {
     uint8_t value = 0xFF;
@@ -1430,41 +1516,25 @@ uint8_t memory_read(MemoryState *mem, uint16_t address)
         if (delta < fetch_patch.len)
         {
             value = fetch_patch.bytes[delta];
-            if (mem && mem->cpu && mem->cpu->profile_data_reads_active)
-                recomp_probe_on_data_read(mem->cpu, address, value);
             return value;
         }
     }
 
     if (address == 0xFF00)
     {
+        mem->joypad_read_count++;
         value = joypad_read(mem);
         mem->memory.P1_JOYP = value;
-        if (mem && mem->cpu && mem->cpu->profile_data_reads_active)
-            recomp_probe_on_data_read(mem->cpu, address, value);
         return value;
     }
 
     if (address >= 0x8000 && address <= 0x9FFF && ppu_vram_locked(mem))
-    {
-        value = 0xFF;
-        if (mem && mem->cpu && mem->cpu->profile_data_reads_active)
-            recomp_probe_on_data_read(mem->cpu, address, value);
-        return value;
-    }
+        return 0xFF;
 
     if (address >= 0xFE00 && address <= 0xFE9F && ppu_oam_locked(mem))
-    {
-        value = 0xFF;
-        if (mem && mem->cpu && mem->cpu->profile_data_reads_active)
-            recomp_probe_on_data_read(mem->cpu, address, value);
-        return value;
-    }
+        return 0xFF;
 
-    value = memory_raw_read(mem, address);
-    if (mem && mem->cpu && mem->cpu->profile_data_reads_active)
-        recomp_probe_on_data_read(mem->cpu, address, value);
-    return value;
+    return memory_raw_read(mem, address);
 }
 
 void memory_write(MemoryState *mem, uint16_t address, uint8_t value)
@@ -1495,59 +1565,71 @@ void memory_write(MemoryState *mem, uint16_t address, uint8_t value)
         mem->joypad_select = value & 0x30;
         uint8_t joy = joypad_read(mem);
         mem->memory.P1_JOYP = joy;
+        memory_probe_data_write(mem, address, joy);
         return;
     }
     case 0xFF04: // DIV
         if (mem->cpu)
         {
             cpu_timer_div_write(mem->cpu);
+            memory_probe_data_write(mem, address, mem->memory.DIV);
         }
         else
         {
             mem->memory.DIV = 0;
+            memory_probe_data_write(mem, address, mem->memory.DIV);
         }
         return;
     case 0xFF05: // TIMA
         if (mem->cpu)
         {
             cpu_timer_tima_write(mem->cpu, value);
+            memory_probe_data_write(mem, address, mem->memory.TIMA);
         }
         else
         {
             mem->memory.TIMA = value;
+            memory_probe_data_write(mem, address, mem->memory.TIMA);
         }
         return;
     case 0xFF06: // TMA
         if (mem->cpu)
         {
             cpu_timer_tma_write(mem->cpu, value);
+            memory_probe_data_write(mem, address, mem->memory.TMA);
         }
         else
         {
             mem->memory.TMA = value;
+            memory_probe_data_write(mem, address, mem->memory.TMA);
         }
         return;
     case 0xFF07: // TAC
         if (mem->cpu)
         {
             cpu_timer_tac_write(mem->cpu, value);
+            memory_probe_data_write(mem, address, mem->memory.TAC);
         }
         else
         {
             mem->memory.TAC = (uint8_t)(value | 0xF8);
+            memory_probe_data_write(mem, address, mem->memory.TAC);
         }
         return;
     case 0xFF0F:
         mem->memory.IF = value & 0x1F;
+        memory_probe_data_write(mem, address, mem->memory.IF);
         return;
     case 0xFF46: // DMA
     {
         mem->memory.DMA = value;
+        memory_probe_data_write(mem, address, mem->memory.DMA);
         uint16_t source = (uint16_t)(value << 8);
         for (int i = 0; i < 0xA0; ++i)
         {
             uint8_t data = memory_read(mem, (uint16_t)(source + i));
             mem->memory.oam[i] = data;
+            memory_probe_data_write(mem, (uint16_t)(0xFE00u + i), data);
         }
         if (mem->cpu)
         {
@@ -1559,12 +1641,15 @@ void memory_write(MemoryState *mem, uint16_t address, uint8_t value)
         uint8_t keep_ro = mem->memory.STAT & 0x07;
         uint8_t new_rw = (value & 0x78);
         mem->memory.STAT = keep_ro | new_rw;
+        memory_probe_data_write(mem, address, mem->memory.STAT);
         return;
     case 0xFF44:
         mem->memory.LY = 0;
+        memory_probe_data_write(mem, address, mem->memory.LY);
         return;
     case 0xFFFF:
         mem->memory.IE = value & 0x1F;
+        memory_probe_data_write(mem, address, mem->memory.IE);
         return;
 
     default:
@@ -1572,6 +1657,7 @@ void memory_write(MemoryState *mem, uint16_t address, uint8_t value)
     }
 
     memory_raw_write(mem, address, value);
+    memory_probe_data_write(mem, address, value);
 }
 
 void memory_set_button_state(MemoryState *mem, JoypadInput input, bool pressed)
@@ -1624,10 +1710,31 @@ void memory_flush_rom_read_trace(void)
 
 size_t memory_get_rom_read_unique_count(void)
 {
-    return rom_read_unique_count;
+    rom_trace_lock();
+    size_t v = rom_read_unique_count;
+    rom_trace_unlock();
+    return v;
 }
 
 size_t memory_get_rom_read_track_size(void)
 {
-    return rom_read_track_size;
+    rom_trace_lock();
+    size_t v = rom_read_track_size;
+    rom_trace_unlock();
+    return v;
+}
+
+size_t memory_get_rom_data_read_unique_count(void)
+{
+    rom_trace_lock();
+    size_t v = rom_data_read_unique_count;
+    rom_trace_unlock();
+    return v;
+}
+
+uint64_t memory_get_joypad_read_count(const MemoryState *mem)
+{
+    if (!mem)
+        return 0u;
+    return mem->joypad_read_count;
 }
