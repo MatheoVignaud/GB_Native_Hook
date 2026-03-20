@@ -45,6 +45,10 @@ static bool ppu_legacy_scanline_renderer = false;
 static uint32_t ppu_last_hash = 0;
 static uint32_t ppu_same_hash_count = 0;
 static uint64_t ppu_frame_counter = 0;
+static bool ppu_lcd_on_config_inited = false;
+static uint16_t ppu_lcd_on_startup_delay_dots = 1;
+static uint16_t ppu_lcd_on_initial_dots = 0;
+static uint8_t ppu_lcd_on_initial_mode = STAT_MODE_0;
 
 static void ppu_trace_init(void)
 {
@@ -75,6 +79,54 @@ static void ppu_trace_init(void)
     ppu_trace_enabled = true;
     fprintf(ppu_trace_file, "PPU trace enabled\n");
     fflush(ppu_trace_file);
+}
+
+static void ppu_lcd_on_config_init(void)
+{
+    if (ppu_lcd_on_config_inited)
+        return;
+    ppu_lcd_on_config_inited = true;
+
+    const char *startup_env = getenv("GB_LCD_ON_STARTUP_DOTS");
+    if (startup_env && startup_env[0] != '\0')
+    {
+        unsigned long value = strtoul(startup_env, NULL, 10);
+        if (value <= DOTS_PER_SCANLINE)
+            ppu_lcd_on_startup_delay_dots = (uint16_t)value;
+    }
+
+    const char *dots_env = getenv("GB_LCD_ON_DOTS");
+    if (dots_env && dots_env[0] != '\0')
+    {
+        unsigned long value = strtoul(dots_env, NULL, 10);
+        if (value < DOTS_PER_SCANLINE)
+            ppu_lcd_on_initial_dots = (uint16_t)value;
+    }
+
+    const char *mode_env = getenv("GB_LCD_ON_MODE");
+    if (mode_env && mode_env[0] != '\0')
+    {
+        unsigned long value = strtoul(mode_env, NULL, 10);
+        if (value <= 3)
+            ppu_lcd_on_initial_mode = (uint8_t)value;
+    }
+}
+
+void ppu_prepare_lcd_enable(PPUState *ppu)
+{
+    assert(ppu);
+    ppu_lcd_on_config_init();
+
+    ppu->lcd_enabled = true;
+    ppu->dots = ppu_lcd_on_initial_dots;
+    ppu->mem->LY = 0;
+    ppu->frame_ready = false;
+    ppu->last_mode = STAT_MODE_0;
+    ppu->lyc_match = false;
+    ppu->lcd_startup_delay_dots = ppu_lcd_on_startup_delay_dots;
+    ppu_clear_framebuffer(ppu);
+    ppu->mem->STAT = (uint8_t)((ppu->mem->STAT & ~STAT_MODE_MASK) | ppu_lcd_on_initial_mode);
+    ppu_update_lyc(ppu);
 }
 
 static uint32_t ppu_frame_hash(const uint32_t *pixels, size_t count)
@@ -152,6 +204,53 @@ static void ppu_render_frame_with_viruappu(PPUState *ppu)
             fflush(ppu_trace_file);
         }
     }
+}
+
+/* ── GBC (CGB) full-frame renderer via Mode8 ──────────────────────────── */
+
+static void ppu_render_frame_gbc_with_viruappu(PPUState *ppu)
+{
+    MemoryState *ms = ppu->mem_state;
+
+    GBCPPURegisters regs = {
+        .LCDC = ppu->mem->LCDC,
+        .SCY  = ppu->mem->SCY,
+        .SCX  = ppu->mem->SCX,
+        .WY   = ppu->mem->WY,
+        .WX   = ppu->mem->WX,
+    };
+
+    const uint8_t *oam_ptr = ppu->mem->oam;
+    uint8_t oam_patched[160];
+
+    /*
+     * DMG compat: on real CGB in DMG mode, OAM byte-3 bit 4
+     * (DMG OBP0/OBP1 select) is mapped to CGB OBJ palette 0/1.
+     * Mode8 reads bits 0-2 for the CGB palette index, so we need
+     * to copy bit 4 into bit 0 for each sprite.
+     */
+    if (ms->dmg_compat)
+    {
+        memcpy(oam_patched, ppu->mem->oam, 160);
+        for (int i = 0; i < 40; ++i)
+        {
+            uint8_t attr = oam_patched[i * 4 + 3];
+            uint8_t dmg_pal = (attr >> 4) & 0x01; /* bit 4 = DMG palette */
+            attr = (uint8_t)((attr & 0xF8) | dmg_pal); /* put into bits 0-2 */
+            oam_patched[i * 4 + 3] = attr;
+        }
+        oam_ptr = oam_patched;
+    }
+
+    viruappu_render_gbc_frame(ppu->mem->vram,       /* bank 0 */
+                              ms->vram_extra,        /* bank 1 */
+                              oam_ptr,
+                              ms->bg_cram,
+                              ms->obj_cram,
+                              &regs,
+                              ppu->scanline_lcdc,
+                              ppu->fb,
+                              GB_SCREEN_WIDTH);
 }
 
 static void ppu_eval_sprites(PPUState *ppu)
@@ -267,6 +366,7 @@ void ppu_reset(PPUState *ppu, bool bios_enabled)
     ppu->last_mode = STAT_MODE_0;
     ppu->lcd_enabled = (ppu->mem->LCDC & LCDC_ENABLE) != 0;
     ppu->lyc_match = false;
+    ppu->lcd_startup_delay_dots = 0;
     ppu->sprite_count = 0;
     ppu_clear_framebuffer(ppu);
     ppu_update_lyc(ppu);
@@ -291,6 +391,41 @@ static void ppu_update_lyc(PPUState *ppu)
     }
 }
 
+/* ── CGB HBlank HDMA: transfer 16 bytes when entering Mode 0 ──────── */
+static void ppu_hdma_hblank_transfer(PPUState *ppu)
+{
+    MemoryState *ms = ppu->mem_state;
+    if (!ms || !ms->gbc_mode || !ms->hdma_active || ms->hdma_remain == 0)
+        return;
+
+    /* Transfer 16 bytes from hdma_src to hdma_dst (VRAM) */
+    for (uint8_t i = 0; i < 16; ++i)
+    {
+        /* HDMA uses the bus directly – bypass PPU mode locks */
+        uint8_t b = memory_raw_read(ms, ms->hdma_src);
+        uint16_t dst = ms->hdma_dst;
+        /* Destination wraps within VRAM (0x8000-0x9FFF) */
+        uint16_t voff = (uint16_t)((dst - 0x8000u) & 0x1FFFu);
+        if (ms->vram_bank == 1)
+            ms->vram_extra[voff] = b;
+        else
+            ms->memory.data[0x8000u + voff] = b;
+        ms->hdma_src++;
+        ms->hdma_dst++;
+    }
+    ms->hdma_remain -= 16;
+
+    /* HBlank DMA costs 8 M-cycles in normal speed, 16 in double speed */
+    if (ms->cpu)
+        ms->cpu->cycle_count += ms->double_speed ? 16u : 8u;
+
+    if (ms->hdma_remain == 0)
+    {
+        ms->hdma_active = false;
+        ms->hdma5 = 0xFF;
+    }
+}
+
 static void ppu_set_mode(PPUState *ppu, uint8_t mode)
 {
     uint8_t stat = ppu->mem->STAT;
@@ -308,6 +443,8 @@ static void ppu_set_mode(PPUState *ppu, uint8_t mode)
             {
                 ppu->mem->IF |= IF_LCDSTAT;
             }
+            /* CGB HBlank HDMA: transfer 16 bytes per HBlank */
+            ppu_hdma_hblank_transfer(ppu);
             break;
         case STAT_MODE_1:
         {
@@ -487,6 +624,7 @@ static void ppu_lcd_off(PPUState *ppu)
     ppu->frame_ready = false;
     ppu->last_mode = STAT_MODE_0;
     ppu->lyc_match = false;
+    ppu->lcd_startup_delay_dots = 0;
     ppu->sprite_count = 0;
     ppu_clear_framebuffer(ppu);
     ppu->mem->STAT = (uint8_t)((ppu->mem->STAT & ~STAT_MODE_MASK) | STAT_MODE_0);
@@ -495,6 +633,8 @@ static void ppu_lcd_off(PPUState *ppu)
 
 static inline uint8_t ppu_current_mode(const PPUState *ppu)
 {
+    if (ppu->lcd_startup_delay_dots != 0)
+        return STAT_MODE_0;
     if (ppu->mem->LY >= VBLANK_SCANLINE_START)
         return STAT_MODE_1;
     if (ppu->dots < 80)
@@ -506,6 +646,9 @@ static inline uint8_t ppu_current_mode(const PPUState *ppu)
 
 static inline uint32_t ppu_dots_until_boundary(const PPUState *ppu, uint8_t mode)
 {
+    if (ppu->lcd_startup_delay_dots != 0)
+        return ppu->lcd_startup_delay_dots;
+
     switch (mode)
     {
     case STAT_MODE_2:
@@ -524,35 +667,54 @@ void ppu_step(PPUState *ppu, uint32_t cpu_cycles)
     if ((ppu->mem->LCDC & LCDC_ENABLE) == 0)
     {
         ppu_lcd_off(ppu);
+        if (ppu->mem_state && ppu->mem_state->cpu)
+            ppu->mem_state->ppu_synced_cycles = ppu->mem_state->cpu->cycle_count;
         return;
     }
 
     if (!ppu->lcd_enabled)
     {
-        ppu->lcd_enabled = true;
-        ppu->dots = 0;
-        ppu->mem->LY = 0;
-        ppu->frame_ready = false;
-        ppu->last_mode = STAT_MODE_0;
-        ppu->lyc_match = false;
-        ppu_clear_framebuffer(ppu);
-        ppu_update_lyc(ppu);
+        ppu_prepare_lcd_enable(ppu);
     }
 
     uint32_t dots_to_advance = cpu_cycles * DOTS_PER_CPU_CYCLE;
+
+    /* In CGB double-speed mode, CPU M-cycles are twice as fast but PPU
+       stays at the same speed → PPU advances half the dots per M-cycle. */
+    if (ppu->mem_state && ppu->mem_state->double_speed)
+        dots_to_advance = cpu_cycles * (DOTS_PER_CPU_CYCLE / 2);
     ppu_update_lyc(ppu);
 
     while (dots_to_advance > 0)
     {
-        if (ppu->dots == 0 && ppu_legacy_scanline_renderer)
+        if (ppu->lcd_startup_delay_dots != 0)
         {
+            uint32_t advance = ppu->lcd_startup_delay_dots;
+            if (advance > dots_to_advance)
+                advance = dots_to_advance;
+
+            ppu_set_mode(ppu, STAT_MODE_0);
+            ppu->lcd_startup_delay_dots = (uint16_t)(ppu->lcd_startup_delay_dots - advance);
+            dots_to_advance -= advance;
+            continue;
+        }
+
+        if (ppu->dots == 0)
+        {
+            /* Capture per-scanline LCDC for full-frame GBC renderer */
             if (ppu->mem->LY < GB_SCREEN_HEIGHT)
+                ppu->scanline_lcdc[ppu->mem->LY] = ppu->mem->LCDC;
+
+            if (ppu_legacy_scanline_renderer)
             {
-                ppu_eval_sprites(ppu);
-            }
-            else
-            {
-                ppu->sprite_count = 0;
+                if (ppu->mem->LY < GB_SCREEN_HEIGHT)
+                {
+                    ppu_eval_sprites(ppu);
+                }
+                else
+                {
+                    ppu->sprite_count = 0;
+                }
             }
         }
 
@@ -596,12 +758,18 @@ void ppu_step(PPUState *ppu, uint32_t cpu_cycles)
                 ppu->mem->LY = 0;
                 if (!ppu_legacy_scanline_renderer)
                 {
-                    ppu_render_frame_with_viruappu(ppu);
+                    if (ppu->mem_state && ppu->mem_state->gbc_mode)
+                        ppu_render_frame_gbc_with_viruappu(ppu);
+                    else
+                        ppu_render_frame_with_viruappu(ppu);
                 }
                 ppu->frame_ready = true;
             }
             ppu_update_lyc(ppu);
         }
     }
+
+    if (ppu->mem_state && ppu->mem_state->cpu)
+        ppu->mem_state->ppu_synced_cycles = ppu->mem_state->cpu->cycle_count;
 }
 

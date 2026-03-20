@@ -31,5 +31,6 @@ void cpu_timer_tima_write(CPUState *cpu, uint8_t value);
 void cpu_timer_tma_write(CPUState *cpu, uint8_t value);
 void cpu_timer_tac_write(CPUState *cpu, uint8_t value);
 void cpu_dma_transfer(CPUState *cpu, uint16_t source);
+void cpu_sync_instruction_timers(CPUState *cpu);
 
 #endif

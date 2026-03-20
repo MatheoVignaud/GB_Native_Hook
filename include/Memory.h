@@ -82,6 +82,7 @@ typedef struct
 } CartridgeState;
 
 struct CPUState;
+struct PPUState;
 
 #if defined(_MSC_VER)
 #pragma pack(push, 1)
@@ -223,29 +224,104 @@ _Static_assert(OFFS(Memory, LCDC) == 0xFF40, "LCDC");
 _Static_assert(OFFS(Memory, WX) == 0xFF4B, "WX");
 _Static_assert(OFFS(Memory, BOOT) == 0xFF50, "BOOT");
 
-typedef struct
+typedef struct MemoryState
 {
     Memory memory;
     CartridgeState cartridge;
-    uint8_t bios[0x100]; // BIOS ROM (256 bytes)
+    uint8_t bios[0x900]; // BIOS ROM (DMG: 256 bytes, CGB: 2304 bytes)
+    uint16_t bios_size;  // actual loaded size (0x100 or 0x900)
     bool bios_enabled;
     struct CPUState *cpu; // Back-reference for side effects (timers, etc.)
+    struct PPUState *ppu; // Back-reference for projected mid-instruction PPU timing
+    uint64_t ppu_synced_cycles;
     uint8_t joypad_buttons; // Lower nibble, 1 = released
     uint8_t joypad_dpad;    // Lower nibble, 1 = released
     uint8_t joypad_select;  // Bits 4/5 selection latch
     uint64_t joypad_read_count;
+    bool debug_print_enabled;
+
+    /* ── GBC (CGB) extensions ─────────────────────────────────────────── */
+    bool gbc_mode;
+
+    /* VRAM bank 1 (bank 0 lives in Memory.vram) */
+    uint8_t vram_bank;               // VBK register (only bit 0)
+    uint8_t vram_extra[0x2000];      // 8 KiB VRAM bank 1
+
+    /* WRAM banks 1-7 (bank 0 lives in Memory.wram[0..0xFFF]) */
+    uint8_t wram_bank;               // SVBK register (bits 0-2, 0 maps to 1)
+    uint8_t wram_extra[7 * 0x1000];  // 7 × 4 KiB (banks 1-7)
+
+    /* Color palette RAM */
+    uint8_t bg_cram[64];             // 8 palettes × 4 colors × 2 bytes
+    uint8_t obj_cram[64];
+    uint8_t bgpi;                    // BCPS / BGPI (0xFF68) – auto-increment + index
+    uint8_t obpi;                    // OCPS / OBPI (0xFF6A)
+
+    /* ── CGB speed switch (KEY1 – 0xFF4D) ──────────────────────────────── */
+    bool     double_speed;           // true when running in double-speed mode
+    uint8_t  key1;                   // KEY1 register: bit 7 = current speed, bit 0 = prepare
+
+    /* ── CGB HDMA (0xFF51-0xFF55) ─────────────────────────────────────── */
+    uint8_t  hdma1;                  // source high
+    uint8_t  hdma2;                  // source low  (lower 4 bits ignored)
+    uint8_t  hdma3;                  // dest high   (only bits 4-0, top 3 = 100)
+    uint8_t  hdma4;                  // dest low    (lower 4 bits ignored)
+    uint8_t  hdma5;                  // length/mode/start
+    bool     hdma_active;            // HBlank HDMA transfer in progress
+    uint16_t hdma_src;               // current source address
+    uint16_t hdma_dst;               // current destination (VRAM, 0x8000-0x9FFF)
+    uint16_t hdma_remain;            // remaining bytes (0 = done)
+
+    /* ── CGB misc registers ───────────────────────────────────────────── */
+    uint8_t  rp;                     // RP (0xFF56) infrared – stub
+    uint8_t  opri;                   // OPRI (0xFF6C) object priority mode
+    uint8_t  undoc_ff72;             // undocumented
+    uint8_t  undoc_ff73;
+    uint8_t  undoc_ff74;
+    uint8_t  undoc_ff75;
+
+    /* DMG-on-CGB compatibility: base palettes assigned by CGB boot ROM */
+    bool     dmg_compat;             // true if DMG game running on CGB
+    uint16_t dmg_bg_pal[4];          // base BG palette (RGB555)
+    uint16_t dmg_obj0_pal[4];        // base OBJ palette 0
+    uint16_t dmg_obj1_pal[4];        // base OBJ palette 1
+
+    /* Channel 3 runtime state for wave RAM access quirks */
+    uint16_t apu_ch3_timer_tcycles;
+    uint8_t  apu_ch3_sample_buffer;
+    uint8_t  apu_ch3_current_byte;
+    uint8_t  apu_ch3_current_index;
+    uint8_t  apu_ch3_pattern_offset;
+    uint8_t  apu_ch3_fetch_age_tcycles;
+    bool     apu_ch3_has_fetched;
+    bool     apu_ch3_restart_pending;
+    uint16_t apu_ch3_period_current;
+    uint16_t apu_ch3_period_pending;
+    bool     apu_ch3_period_pending_valid;
+    uint64_t apu_ch3_tcycle_counter;
+    uint64_t apu_ch3_fetch_tcycle[2];
+    uint8_t  apu_ch3_fetch_byte[2];
+    uint8_t  apu_ch3_fetch_index[2];
+    bool     apu_ch3_fetch_valid[2];
 } MemoryState;
 
 int load_rom(const char *path, MemoryState *mem);
 int load_rom_from_buffer(const uint8_t *data, size_t size, MemoryState *mem);
-int load_bios(const char *path, uint8_t *bios);
+int load_bios(const char *path, uint8_t *bios, uint16_t *out_size);
 
 void memory_init(MemoryState *mem);
 void memory_shutdown(MemoryState *mem);
 void memory_set_logging(bool enabled);
+void memory_set_debug_print(MemoryState *mem, bool enabled);
 
 void memory_set_button_state(MemoryState *mem, JoypadInput input, bool pressed);
 void memory_set_save_path_hint(MemoryState *mem, const char *rom_path);
+void memory_apu_frame_sequencer_tick(MemoryState *mem);
+void memory_apu_runtime_step(MemoryState *mem, uint32_t cycles);
+void memory_oam_bug_idu_incdec(MemoryState *mem, uint16_t addr);
+void memory_oam_bug_read(MemoryState *mem, uint16_t addr);
+void memory_oam_bug_read_incdec(MemoryState *mem, uint16_t addr);
+void memory_oam_bug_blocked_read(MemoryState *mem, uint16_t addr);
 void memory_flush_rom_read_trace(void);
 size_t memory_get_rom_read_unique_count(void);
 size_t memory_get_rom_read_track_size(void);
@@ -255,6 +331,7 @@ void memory_set_fetch_patch(uint16_t start, const uint8_t *bytes, uint8_t len);
 void memory_clear_fetch_patch(void);
 
 uint8_t memory_read(MemoryState *mem, uint16_t address);
+uint8_t memory_raw_read(MemoryState *mem, uint16_t address);
 void memory_write(MemoryState *mem, uint16_t address, uint8_t value);
 
 #endif

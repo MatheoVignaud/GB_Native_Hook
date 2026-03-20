@@ -36,8 +36,11 @@ static inline void ld_hl_r8(uint8_t value, CPUState *cpu)
 
 static inline void ld_hl_n8(uint8_t value, CPUState *cpu)
 {
+    cpu->cycle_count += 1;
+    cpu_sync_instruction_timers(cpu);
+    cpu->cycle_count += 1;
     memory_write(cpu->memory, cpu->HL, value);
-    cpu->cycle_count += 3;
+    cpu->cycle_count += 1;
 }
 
 static inline void ld_r8_hl(uint8_t *dest, CPUState *cpu)
@@ -54,14 +57,20 @@ static inline void ld_r16_a(uint16_t dest_addr, CPUState *cpu)
 
 static inline void ld_n16_a(uint16_t addr, CPUState *cpu)
 {
+    cpu->cycle_count += 2;
+    cpu_sync_instruction_timers(cpu);
+    cpu->cycle_count += 1;
     memory_write(cpu->memory, addr, cpu->A);
-    cpu->cycle_count += 4;
+    cpu->cycle_count += 1;
 }
 
 static inline void ldh_n16_a(uint8_t offset, CPUState *cpu)
 {
+    cpu->cycle_count += 1;
+    cpu_sync_instruction_timers(cpu);
+    cpu->cycle_count += 1;
     memory_write(cpu->memory, 0xFF00 + offset, cpu->A);
-    cpu->cycle_count += 3;
+    cpu->cycle_count += 1;
 }
 
 static inline void ldh_c_a(CPUState *cpu)
@@ -80,8 +89,11 @@ static inline void ld_a_n16(CPUState *cpu)
 {
     uint16_t addr = (uint16_t)(memory_read(cpu->memory, cpu->PC) | (memory_read(cpu->memory, cpu->PC + 1) << 8));
     cpu->PC += 2;
+    cpu->cycle_count += 2;
+    cpu_sync_instruction_timers(cpu);
+    cpu->cycle_count += 1;
     cpu->A = memory_read(cpu->memory, addr);
-    cpu->cycle_count += 4;
+    cpu->cycle_count += 1;
 }
 
 static inline void ldh_a_c(CPUState *cpu)
@@ -107,15 +119,19 @@ static inline void ld_hl_dec_a(CPUState *cpu)
 static inline void ld_a_hl_inc(CPUState *cpu)
 {
     cpu->A = memory_read(cpu->memory, cpu->HL);
+    cpu->cycle_count += 1;
+    memory_oam_bug_read_incdec(cpu->memory, cpu->HL);
     cpu->HL++;
-    cpu->cycle_count += 2;
+    cpu->cycle_count += 1;
 }
 
 static inline void ld_a_hl_dec(CPUState *cpu)
 {
     cpu->A = memory_read(cpu->memory, cpu->HL);
+    cpu->cycle_count += 1;
+    memory_oam_bug_read_incdec(cpu->memory, cpu->HL);
     cpu->HL--;
-    cpu->cycle_count += 2;
+    cpu->cycle_count += 1;
 }
 
 static inline void ld_sp_n16(uint16_t value, CPUState *cpu)
@@ -135,8 +151,11 @@ static inline void ld_n16_sp(CPUState *cpu)
 
 static inline void ldh_n8_a(uint8_t offset, CPUState *cpu)
 {
+    cpu->cycle_count += 1;
+    cpu_sync_instruction_timers(cpu);
+    cpu->cycle_count += 1;
     memory_write(cpu->memory, 0xFF00 + offset, cpu->A);
-    cpu->cycle_count += 3;
+    cpu->cycle_count += 1;
 }
 
 static inline void ld_hl_sp_e8(CPUState *cpu)
@@ -166,8 +185,11 @@ static inline void ldh_a_a8(CPUState *cpu)
 {
     uint8_t imm = memory_read(cpu->memory, cpu->PC++);
     uint16_t addr = 0xFF00u + imm;
+    cpu->cycle_count += 1;
+    cpu_sync_instruction_timers(cpu);
+    cpu->cycle_count += 1;
     cpu->A = memory_read(cpu->memory, addr);
-    cpu->cycle_count += 3;
+    cpu->cycle_count += 1;
 }
 
 // ARITHMETIC INSTRUCTIONS
@@ -356,14 +378,19 @@ static inline void dec_hl(CPUState *cpu)
     else
         cpu->F &= ~FLAG_H;
 
+    cpu->cycle_count += 1;
+    cpu_sync_instruction_timers(cpu);
     memory_write(cpu->memory, cpu->HL, result);
-    cpu->cycle_count += 3;
+    cpu->cycle_count += 2;
 }
 
 static inline void dec_r16(uint16_t *reg, CPUState *cpu)
 {
+    uint16_t old = *reg;
+    cpu->cycle_count += 1;
+    memory_oam_bug_idu_incdec(cpu->memory, old);
     (*reg)--;
-    cpu->cycle_count += 2;
+    cpu->cycle_count += 1;
 }
 
 static inline void inc_r8(uint8_t *reg, CPUState *cpu)
@@ -386,8 +413,11 @@ static inline void inc_r8(uint8_t *reg, CPUState *cpu)
 
 static inline void inc_r16(uint16_t *reg, CPUState *cpu)
 {
+    uint16_t old = *reg;
+    cpu->cycle_count += 1;
+    memory_oam_bug_idu_incdec(cpu->memory, old);
     (*reg)++;
-    cpu->cycle_count += 2;
+    cpu->cycle_count += 1;
 }
 
 static inline void inc_hl(CPUState *cpu)
@@ -405,8 +435,10 @@ static inline void inc_hl(CPUState *cpu)
     else
         cpu->F &= ~FLAG_H;
 
+    cpu->cycle_count += 1;
+    cpu_sync_instruction_timers(cpu);
     memory_write(cpu->memory, cpu->HL, result);
-    cpu->cycle_count += 3;
+    cpu->cycle_count += 2;
 }
 
 static inline void sbc_a_r8(uint8_t value, CPUState *cpu)
@@ -541,9 +573,10 @@ static inline void bit_u3_r8(uint8_t bit, uint8_t reg, CPUState *cpu)
 
 static inline void bit_u3_hl(uint8_t bit, CPUState *cpu)
 {
+    cpu->cycle_count += 1;
+    cpu_sync_instruction_timers(cpu);
     uint8_t hl_value = memory_read(cpu->memory, cpu->HL);
     bit_u3_r8(bit, hl_value, cpu);
-    cpu->cycle_count += 2;
 }
 
 static inline void res_u3_r8(uint8_t bit, uint8_t *reg, CPUState *cpu)
@@ -554,10 +587,14 @@ static inline void res_u3_r8(uint8_t bit, uint8_t *reg, CPUState *cpu)
 
 static inline void res_u3_hl(uint8_t bit, CPUState *cpu)
 {
+    cpu->cycle_count += 1;
+    cpu_sync_instruction_timers(cpu);
     uint8_t hl_value = memory_read(cpu->memory, cpu->HL);
     hl_value &= ~(1 << bit);
+    cpu->cycle_count += 1;
+    cpu_sync_instruction_timers(cpu);
     memory_write(cpu->memory, cpu->HL, hl_value);
-    cpu->cycle_count += 4;
+    cpu->cycle_count += 2;
 }
 
 static inline void set_u3_r8(uint8_t bit, uint8_t *reg, CPUState *cpu)
@@ -568,10 +605,14 @@ static inline void set_u3_r8(uint8_t bit, uint8_t *reg, CPUState *cpu)
 
 static inline void set_u3_hl(uint8_t bit, CPUState *cpu)
 {
+    cpu->cycle_count += 1;
+    cpu_sync_instruction_timers(cpu);
     uint8_t hl_value = memory_read(cpu->memory, cpu->HL);
     hl_value |= (1 << bit);
+    cpu->cycle_count += 1;
+    cpu_sync_instruction_timers(cpu);
     memory_write(cpu->memory, cpu->HL, hl_value);
-    cpu->cycle_count += 4;
+    cpu->cycle_count += 2;
 }
 
 // BITSHIFTING INSTRUCTIONS
@@ -607,10 +648,15 @@ static inline void rlc_r8(uint8_t *reg, CPUState *cpu)
 
 static inline void rlc_hl(CPUState *cpu)
 {
+    cpu->cycle_count += 1;
+    cpu_sync_instruction_timers(cpu);
     uint8_t hl_value = memory_read(cpu->memory, cpu->HL);
     uint8_t new_carry = (hl_value & 0x80) ? 1 : 0;
 
     hl_value = (hl_value << 1) | new_carry;
+    cpu->cycle_count += 1;
+    cpu_sync_instruction_timers(cpu);
+    cpu->cycle_count += 1;
     memory_write(cpu->memory, cpu->HL, hl_value);
 
     cpu->F = 0;
@@ -619,7 +665,7 @@ static inline void rlc_hl(CPUState *cpu)
     if (new_carry)
         cpu->F |= FLAG_C;
 
-    cpu->cycle_count += 4;
+    cpu->cycle_count += 1;
 }
 
 static inline void rlca(CPUState *cpu)
@@ -665,10 +711,15 @@ static inline void rrc_r8(uint8_t *reg, CPUState *cpu)
 
 static inline void rrc_hl(CPUState *cpu)
 {
+    cpu->cycle_count += 1;
+    cpu_sync_instruction_timers(cpu);
     uint8_t hl_value = memory_read(cpu->memory, cpu->HL);
     uint8_t new_carry = (hl_value & 0x01) ? 1 : 0;
 
     hl_value = (hl_value >> 1) | (new_carry << 7);
+    cpu->cycle_count += 1;
+    cpu_sync_instruction_timers(cpu);
+    cpu->cycle_count += 1;
     memory_write(cpu->memory, cpu->HL, hl_value);
 
     cpu->F = 0;
@@ -677,7 +728,7 @@ static inline void rrc_hl(CPUState *cpu)
     if (new_carry)
         cpu->F |= FLAG_C;
 
-    cpu->cycle_count += 4;
+    cpu->cycle_count += 1;
 }
 
 static inline void rl_r8(uint8_t *reg, CPUState *cpu)
@@ -698,11 +749,16 @@ static inline void rl_r8(uint8_t *reg, CPUState *cpu)
 
 static inline void rl_hl(CPUState *cpu)
 {
+    cpu->cycle_count += 1;
+    cpu_sync_instruction_timers(cpu);
     uint8_t hl_value = memory_read(cpu->memory, cpu->HL);
     uint8_t old_carry = (cpu->F & FLAG_C) ? 1 : 0;
     uint8_t new_carry = (hl_value & 0x80) ? 1 : 0;
 
     hl_value = (hl_value << 1) | old_carry;
+    cpu->cycle_count += 1;
+    cpu_sync_instruction_timers(cpu);
+    cpu->cycle_count += 1;
     memory_write(cpu->memory, cpu->HL, hl_value);
 
     cpu->F = 0;
@@ -711,7 +767,7 @@ static inline void rl_hl(CPUState *cpu)
     if (new_carry)
         cpu->F |= FLAG_C;
 
-    cpu->cycle_count += 4;
+    cpu->cycle_count += 1;
 }
 
 static inline void swap_r8(uint8_t *reg, CPUState *cpu)
@@ -727,15 +783,20 @@ static inline void swap_r8(uint8_t *reg, CPUState *cpu)
 
 static inline void swap_hl(CPUState *cpu)
 {
+    cpu->cycle_count += 1;
+    cpu_sync_instruction_timers(cpu);
     uint8_t hl_value = memory_read(cpu->memory, cpu->HL);
     hl_value = ((hl_value & 0x0F) << 4) | ((hl_value & 0xF0) >> 4);
+    cpu->cycle_count += 1;
+    cpu_sync_instruction_timers(cpu);
+    cpu->cycle_count += 1;
     memory_write(cpu->memory, cpu->HL, hl_value);
 
     cpu->F = 0;
     if (hl_value == 0)
         cpu->F |= FLAG_Z;
 
-    cpu->cycle_count += 4;
+    cpu->cycle_count += 1;
 }
 
 static inline void sla_r8(uint8_t *reg, CPUState *cpu)
@@ -755,10 +816,15 @@ static inline void sla_r8(uint8_t *reg, CPUState *cpu)
 
 static inline void sla_hl(CPUState *cpu)
 {
+    cpu->cycle_count += 1;
+    cpu_sync_instruction_timers(cpu);
     uint8_t hl_value = memory_read(cpu->memory, cpu->HL);
     uint8_t new_carry = (hl_value & 0x80) ? 1 : 0;
 
     hl_value <<= 1;
+    cpu->cycle_count += 1;
+    cpu_sync_instruction_timers(cpu);
+    cpu->cycle_count += 1;
     memory_write(cpu->memory, cpu->HL, hl_value);
 
     cpu->F = 0;
@@ -767,7 +833,7 @@ static inline void sla_hl(CPUState *cpu)
     if (new_carry)
         cpu->F |= FLAG_C;
 
-    cpu->cycle_count += 4;
+    cpu->cycle_count += 1;
 }
 
 static inline void srl_r8(uint8_t *reg, CPUState *cpu)
@@ -787,9 +853,14 @@ static inline void srl_r8(uint8_t *reg, CPUState *cpu)
 
 static inline void srl_hl(CPUState *cpu)
 {
+    cpu->cycle_count += 1;
+    cpu_sync_instruction_timers(cpu);
     uint8_t v = memory_read(cpu->memory, cpu->HL);
     uint8_t new_carry = v & 0x01;
     v >>= 1;
+    cpu->cycle_count += 1;
+    cpu_sync_instruction_timers(cpu);
+    cpu->cycle_count += 1;
     memory_write(cpu->memory, cpu->HL, v);
 
     cpu->F = 0;
@@ -797,7 +868,7 @@ static inline void srl_hl(CPUState *cpu)
         cpu->F |= FLAG_Z;
     if (new_carry)
         cpu->F |= FLAG_C;
-    cpu->cycle_count += 4;
+    cpu->cycle_count += 1;
 }
 
 static inline void sra_r8(uint8_t *reg, CPUState *cpu)
@@ -818,11 +889,16 @@ static inline void sra_r8(uint8_t *reg, CPUState *cpu)
 
 static inline void sra_hl(CPUState *cpu)
 {
+    cpu->cycle_count += 1;
+    cpu_sync_instruction_timers(cpu);
     uint8_t hl_value = memory_read(cpu->memory, cpu->HL);
     uint8_t new_carry = (hl_value & 0x01) ? 1 : 0;
     uint8_t msb = hl_value & 0x80;
 
     hl_value = msb | (hl_value >> 1);
+    cpu->cycle_count += 1;
+    cpu_sync_instruction_timers(cpu);
+    cpu->cycle_count += 1;
     memory_write(cpu->memory, cpu->HL, hl_value);
 
     cpu->F = 0;
@@ -831,7 +907,7 @@ static inline void sra_hl(CPUState *cpu)
     if (new_carry)
         cpu->F |= FLAG_C;
 
-    cpu->cycle_count += 4;
+    cpu->cycle_count += 1;
 }
 
 static inline void rr_r8(uint8_t *reg, CPUState *cpu)
@@ -852,11 +928,16 @@ static inline void rr_r8(uint8_t *reg, CPUState *cpu)
 
 static inline void rr_hl(CPUState *cpu)
 {
+    cpu->cycle_count += 1;
+    cpu_sync_instruction_timers(cpu);
     uint8_t hl_value = memory_read(cpu->memory, cpu->HL);
     uint8_t old_carry = (cpu->F & FLAG_C) ? 1 : 0;
     uint8_t new_carry = (hl_value & 0x01) ? 1 : 0;
 
     hl_value = (hl_value >> 1) | (old_carry << 7);
+    cpu->cycle_count += 1;
+    cpu_sync_instruction_timers(cpu);
+    cpu->cycle_count += 1;
     memory_write(cpu->memory, cpu->HL, hl_value);
 
     cpu->F = 0;
@@ -865,7 +946,7 @@ static inline void rr_hl(CPUState *cpu)
     if (new_carry)
         cpu->F |= FLAG_C;
 
-    cpu->cycle_count += 4;
+    cpu->cycle_count += 1;
 }
 
 static inline void rra(CPUState *cpu)
@@ -1025,33 +1106,53 @@ static inline void halt(CPUState *cpu)
 
 static inline void pop_af(CPUState *cpu)
 {
-    uint8_t low = memory_read(cpu->memory, cpu->SP++);
-    uint8_t high = memory_read(cpu->memory, cpu->SP++);
+    uint8_t low = memory_read(cpu->memory, cpu->SP);
+    cpu->cycle_count += 1;
+    memory_oam_bug_blocked_read(cpu->memory, cpu->SP);
+    cpu->SP++;
+    uint8_t high = memory_read(cpu->memory, cpu->SP);
+    cpu->cycle_count += 1;
+    memory_oam_bug_blocked_read(cpu->memory, cpu->SP);
+    cpu->SP++;
     cpu->AF = (high << 8) | low;
     cpu->F &= 0xF0;
-    cpu->cycle_count += 3;
+    cpu->cycle_count += 1;
 }
 
 static inline void pop_r16(uint16_t *reg, CPUState *cpu)
 {
-    uint8_t low = memory_read(cpu->memory, cpu->SP++);
-    uint8_t high = memory_read(cpu->memory, cpu->SP++);
+    uint8_t low = memory_read(cpu->memory, cpu->SP);
+    cpu->cycle_count += 1;
+    memory_oam_bug_blocked_read(cpu->memory, cpu->SP);
+    cpu->SP++;
+    uint8_t high = memory_read(cpu->memory, cpu->SP);
+    cpu->cycle_count += 1;
+    memory_oam_bug_blocked_read(cpu->memory, cpu->SP);
+    cpu->SP++;
     *reg = (high << 8) | low;
-    cpu->cycle_count += 3;
+    cpu->cycle_count += 1;
 }
 
 static inline void push_af(CPUState *cpu)
 {
+    cpu->cycle_count += 1;
+    memory_oam_bug_idu_incdec(cpu->memory, cpu->SP);
+    cpu->cycle_count += 1;
     memory_write(cpu->memory, --cpu->SP, (uint8_t)((cpu->AF >> 8) & 0x00FF));
+    cpu->cycle_count += 1;
     memory_write(cpu->memory, --cpu->SP, (uint8_t)(cpu->AF & 0x00FF));
-    cpu->cycle_count += 4;
+    cpu->cycle_count += 1;
 }
 
 static inline void push_r16(uint16_t reg, CPUState *cpu)
 {
+    cpu->cycle_count += 1;
+    memory_oam_bug_idu_incdec(cpu->memory, cpu->SP);
+    cpu->cycle_count += 1;
     memory_write(cpu->memory, --cpu->SP, (uint8_t)((reg >> 8) & 0x00FF));
+    cpu->cycle_count += 1;
     memory_write(cpu->memory, --cpu->SP, (uint8_t)(reg & 0x00FF));
-    cpu->cycle_count += 4;
+    cpu->cycle_count += 1;
 }
 
 // MISCELLANEOUS INSTRUCTIONS
@@ -1105,6 +1206,56 @@ static inline void stop(CPUState *cpu)
 {
     // STOP is a 2-byte instruction (0x10 0x00): consume the trailing byte.
     cpu->PC++;
+
+    /* CGB speed switch: if KEY1 bit 0 (prepare) is set, toggle speed */
+    if (cpu->memory->gbc_mode && (cpu->memory->key1 & 0x01))
+    {
+        static const int stop_timer_bit_table[4] = {9, 3, 5, 7};
+        const bool timer_enabled = (cpu->memory->memory.TAC & 0x04) != 0;
+        const int timer_bit = stop_timer_bit_table[cpu->memory->memory.TAC & 0x03];
+        const bool old_timer_signal = ((cpu->div_counter >> timer_bit) & 0x01u) != 0;
+        const int old_apu_bit = cpu->memory->double_speed ? 13 : 12;
+        const bool old_apu_signal = ((cpu->div_counter >> old_apu_bit) & 0x01u) != 0;
+        const bool new_double_speed = !cpu->memory->double_speed;
+        if (getenv("GB_TRACE_IO") && getenv("GB_TRACE_IO")[0] != '\0' && getenv("GB_TRACE_IO")[0] != '0')
+        {
+            printf("[CPU] STOP speed switch cyc=%llu pc=%04X old_ds=%d new_ds=%d key1=%02X\n",
+                   (unsigned long long)cpu->cycle_count,
+                   cpu->PC,
+                   cpu->memory->double_speed ? 1 : 0,
+                   new_double_speed ? 1 : 0,
+                   cpu->memory->key1);
+        }
+        cpu->memory->double_speed = new_double_speed;
+        /* Update KEY1: bit 7 = current speed, clear prepare bit 0 */
+        cpu->memory->key1 = cpu->memory->double_speed ? 0x80 : 0x00;
+        /* Speed switch resets DIV */
+        cpu->div_counter = 0;
+        cpu->memory->memory.DIV = 0;
+        cpu->timer_prev_signal = false;
+        if (timer_enabled && old_timer_signal)
+        {
+            if (cpu->memory->memory.TIMA == 0xFF)
+            {
+                cpu->memory->memory.TIMA = 0x00;
+                cpu->timer_reload_active = true;
+                cpu->timer_reload_delay = 1;
+            }
+            else
+            {
+                cpu->memory->memory.TIMA++;
+            }
+        }
+        if (old_apu_signal)
+        {
+            memory_apu_frame_sequencer_tick(cpu->memory);
+        }
+        /* Speed switch takes 8200 T-cycles, approximate as ~2050 M-cycles */
+        cpu->cycle_count += 2050;
+        /* Do NOT enter STOP mode when switching speed */
+        return;
+    }
+
     cpu->stop = true;
     cpu->halt = false;
     cpu->halt_bug = false;

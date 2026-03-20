@@ -100,7 +100,10 @@ typedef struct CPUState
     bool timer_reload_active;    // TIMA reload in progress (after overflow)
     uint8_t timer_reload_delay;  // Cycles remaining before reload completes
     bool profile_data_reads_active; // true while executing an opcode body (not fetch/decode)
+    uint64_t instr_timer_synced_cycle_count; // Last cycle count synced mid-instruction
 } CPUState;
+
+void cpu_sync_instruction_timers(CPUState *cpu);
 
 static inline void setZ(CPUState *c, bool v)
 {

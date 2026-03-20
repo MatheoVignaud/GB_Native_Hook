@@ -87,6 +87,14 @@ static inline bool cpu_timer_signal(const CPUState *cpu)
     return ((cpu->div_counter >> cpu_timer_selected_bit(cpu)) & 0x01u) != 0;
 }
 
+static inline bool cpu_apu_div_signal(const CPUState *cpu)
+{
+    int div_apu_bit = 12;
+    if (cpu->memory && cpu->memory->double_speed)
+        div_apu_bit = 13;
+    return ((cpu->div_counter >> div_apu_bit) & 0x01u) != 0;
+}
+
 static inline uint8_t cpu_pending_interrupts(const CPUState *cpu)
 {
     return (uint8_t)(cpu->memory->memory.IF & cpu->memory->memory.IE & 0x1F);
@@ -98,7 +106,7 @@ static void cpu_timer_increment(CPUState *cpu)
     {
         cpu->memory->memory.TIMA = 0x00;
         cpu->timer_reload_active = true;
-        cpu->timer_reload_delay = 4;
+        cpu->timer_reload_delay = 1;
     }
     else
     {
@@ -130,14 +138,23 @@ static void cpu_update_timers(CPUState *cpu, uint32_t cycles)
         cpu_process_timer_reload(cpu);
 
         bool old_signal = cpu->timer_prev_signal;
-        cpu->div_counter = (uint16_t)(cpu->div_counter + 4);
+        bool old_apu_signal = cpu_apu_div_signal(cpu);
+        cpu->div_counter = (uint16_t)(cpu->div_counter + 4u);
         bool new_signal = cpu_timer_signal(cpu);
+        bool new_apu_signal = cpu_apu_div_signal(cpu);
         cpu->timer_prev_signal = new_signal;
 
         if (cpu_timer_enabled(cpu) && old_signal && !new_signal)
         {
             cpu_timer_increment(cpu);
         }
+
+        if (old_apu_signal && !new_apu_signal)
+        {
+            memory_apu_frame_sequencer_tick(cpu->memory);
+        }
+
+        memory_apu_runtime_step(cpu->memory, 1);
     }
 
     cpu->memory->memory.DIV = (uint8_t)(cpu->div_counter >> 8);
@@ -148,6 +165,19 @@ static uint32_t cpu_idle_cycles(CPUState *cpu, uint32_t cycles)
     cpu_update_timers(cpu, cycles);
     cpu->cycle_count += cycles;
     return cycles;
+}
+
+void cpu_sync_instruction_timers(CPUState *cpu)
+{
+    if (!cpu)
+        return;
+
+    if (cpu->cycle_count <= cpu->instr_timer_synced_cycle_count)
+        return;
+
+    uint32_t delta = (uint32_t)(cpu->cycle_count - cpu->instr_timer_synced_cycle_count);
+    cpu_update_timers(cpu, delta);
+    cpu->instr_timer_synced_cycle_count = cpu->cycle_count;
 }
 
 static uint32_t cpu_service_interrupts(CPUState *cpu)
@@ -201,22 +231,31 @@ void cpu_reset(CPUState *cpu)
 {
     cpu_trace_init();
 
-    cpu->A = 0;
-    cpu->F = 0;
-    cpu->B = 0;
-    cpu->C = 0;
-    cpu->D = 0;
-    cpu->E = 0;
-    cpu->H = 0;
-    cpu->L = 0;
-
     cpu->SP = 0xFFFE;
     if (cpu->memory->bios_enabled)
     {
+        cpu->A = 0; cpu->F = 0;
+        cpu->B = 0; cpu->C = 0;
+        cpu->D = 0; cpu->E = 0;
+        cpu->H = 0; cpu->L = 0;
         cpu->PC = 0x0000;
+    }
+    else if (cpu->memory->gbc_mode)
+    {
+        /* Post-boot register state on CGB (no-BIOS path) */
+        cpu->A = 0x11; cpu->F = 0x80;
+        cpu->B = 0x00; cpu->C = 0x00;
+        cpu->D = 0xFF; cpu->E = 0x56;
+        cpu->H = 0x00; cpu->L = 0x0D;
+        cpu->PC = 0x0100;
     }
     else
     {
+        /* Post-boot register state on DMG (no-BIOS path) */
+        cpu->A = 0x01; cpu->F = 0xB0;
+        cpu->B = 0x00; cpu->C = 0x13;
+        cpu->D = 0x00; cpu->E = 0xD8;
+        cpu->H = 0x01; cpu->L = 0x4D;
         cpu->PC = 0x0100;
     }
 
@@ -232,12 +271,56 @@ void cpu_reset(CPUState *cpu)
     cpu->timer_reload_active = false;
     cpu->timer_reload_delay = 0;
     cpu->timer_prev_signal = cpu_timer_signal(cpu);
-    cpu->profile_data_reads_active = false;
-
     cpu->cycle_count = 2;
+    cpu->profile_data_reads_active = false;
+    cpu->instr_timer_synced_cycle_count = cpu->cycle_count;
     cpu->memory->memory.DIV = 0;
     cpu->memory->memory.IF = 0;
     cpu->memory->memory.TIMA = 0;
+
+    /* When BIOS is skipped, set I/O registers to post-boot values (PanDocs) */
+    if (!cpu->memory->bios_enabled)
+    {
+        Memory *io = &cpu->memory->memory;
+        io->SB   = 0x00;
+        io->SC   = cpu->memory->gbc_mode ? 0x7Fu : 0x7Eu;
+        io->LCDC = 0x91;       /* LCD on, BG on, BG tile data 8000 */
+        io->STAT = 0x85;
+        io->SCY  = 0x00;
+        io->SCX  = 0x00;
+        io->LYC  = 0x00;
+        io->DMA  = 0xFF;
+        io->BGP  = 0xFC;
+        io->OBP0 = 0xFF;
+        io->OBP1 = 0xFF;
+        io->WY   = 0x00;
+        io->WX   = 0x00;
+        io->NR10 = 0x00;
+        io->NR11 = 0x80;
+        io->NR12 = 0xF3;
+        io->NR13 = 0x00;
+        io->NR14 = 0x00;
+        io->NR21 = 0x00;
+        io->NR22 = 0x00;
+        io->NR23 = 0x00;
+        io->NR24 = 0x00;
+        io->NR30 = 0x00;
+        io->NR31 = 0x00;
+        io->NR32 = 0x00;
+        io->NR33 = 0x00;
+        io->NR34 = 0x00;
+        io->NR41 = 0x00;
+        io->NR42 = 0x00;
+        io->NR43 = 0x00;
+        io->NR44 = 0x00;
+        io->NR50 = 0x77;
+        io->NR51 = 0xF3;
+        io->NR52 = 0x81;
+        io->TMA  = 0x00;
+        io->TAC  = 0xF8;
+        io->IE   = 0x00;
+        io->IF   = 0x01;       /* VBlank flag set after boot */
+    }
 
     cpu_trace_log(cpu, "RESET");
 }
@@ -262,7 +345,8 @@ static uint32_t cpu_execute_common(CPUState *cpu, bool opcode_predecoded, uint8_
     }
 
     opcodes[opcode](cpu);
-    return cpu_decoded_step_end(cpu, &step);
+    uint32_t cycles = cpu_decoded_step_end(cpu, &step);
+    return cycles;
 }
 
 uint32_t cpu_decoded_step_begin(CPUState *cpu, uint8_t opcode, CPUDecodedStep *step)
@@ -345,8 +429,8 @@ uint32_t cpu_decoded_step_begin(CPUState *cpu, uint8_t opcode, CPUDecodedStep *s
     }
 
     step->prev_cycles = cpu->cycle_count;
+    cpu->instr_timer_synced_cycle_count = cpu->cycle_count;
 
-    uint16_t fetch_pc = cpu->PC;
     if (!cpu->halt_bug)
     {
         cpu->PC++;
@@ -371,8 +455,9 @@ uint32_t cpu_decoded_step_end(CPUState *cpu, CPUDecodedStep *step)
     cpu->profile_data_reads_active = false;
     instruction_count++;
 
+    cpu_sync_instruction_timers(cpu);
+
     uint32_t cycles = (uint32_t)(cpu->cycle_count - step->prev_cycles);
-    cpu_update_timers(cpu, cycles);
 
     if (cpu->IME_enable_pending)
     {
@@ -396,14 +481,21 @@ uint32_t cpu_execute_decoded_instruction(CPUState *cpu, uint8_t opcode)
 void cpu_timer_div_write(CPUState *cpu)
 {
     bool old_signal = cpu_timer_signal(cpu);
+    bool old_apu_signal = cpu_apu_div_signal(cpu);
     cpu->div_counter = 0;
     cpu->memory->memory.DIV = 0;
     bool new_signal = cpu_timer_signal(cpu);
+    bool new_apu_signal = cpu_apu_div_signal(cpu);
     cpu->timer_prev_signal = new_signal;
 
     if (cpu_timer_enabled(cpu) && old_signal && !new_signal)
     {
         cpu_timer_increment(cpu);
+    }
+
+    if (old_apu_signal && !new_apu_signal)
+    {
+        memory_apu_frame_sequencer_tick(cpu->memory);
     }
 }
 
@@ -423,6 +515,7 @@ void cpu_timer_tac_write(CPUState *cpu, uint8_t value)
 {
     bool old_signal = cpu_timer_signal(cpu);
     bool old_enabled = cpu_timer_enabled(cpu);
+    bool old_input = old_enabled && old_signal;
 
     uint8_t tac = (uint8_t)(0xF8 | (value & 0x07));
     cpu->memory->memory.TAC = tac;
@@ -430,8 +523,9 @@ void cpu_timer_tac_write(CPUState *cpu, uint8_t value)
     bool new_signal = cpu_timer_signal(cpu);
     cpu->timer_prev_signal = new_signal;
     bool new_enabled = cpu_timer_enabled(cpu);
+    bool new_input = new_enabled && new_signal;
 
-    if (old_enabled && new_enabled && old_signal && !new_signal)
+    if (old_input && !new_input)
     {
         cpu_timer_increment(cpu);
     }
