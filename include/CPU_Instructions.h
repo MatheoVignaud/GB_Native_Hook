@@ -5,6 +5,7 @@
 #include "CPU.h"
 #include <stdbool.h>
 #include <stdint.h>
+#include "Decompiler.h"
 
 // LOAD INSTRUCTIONS
 
@@ -973,6 +974,10 @@ static inline void call_n16(CPUState *cpu)
     memory_write(cpu->memory, --cpu->SP, (uint8_t)(cpu->PC & 0x00FF));
     cpu->PC = addr;
     cpu->cycle_count += 6;
+    if (decompile)
+    {
+        decompiler_discover_function(addr);
+    }
 }
 
 static inline void call_cc_n16(bool condition, CPUState *cpu)
@@ -985,13 +990,23 @@ static inline void call_cc_n16(bool condition, CPUState *cpu)
     {
         cpu->PC += 2;
         cpu->cycle_count += 3;
+        if (decompile)
+        {
+            uint16_t addr = memory_read(cpu->memory, cpu->PC - 2) | (memory_read(cpu->memory, cpu->PC - 1) << 8);
+            decompiler_discover_function(addr);
+        }
     }
+    
 }
 
 static inline void jp_hl(CPUState *cpu)
 {
     cpu->PC = cpu->HL;
     cpu->cycle_count += 1;
+    if (decompile)
+    {
+        decompiler_discover_function(cpu->PC);
+    }
 }
 
 static inline void jp_n16(CPUState *cpu)
@@ -1000,6 +1015,10 @@ static inline void jp_n16(CPUState *cpu)
     cpu->PC += 2;
     cpu->PC = addr;
     cpu->cycle_count += 4;
+    if (decompile)
+    {
+        decompiler_discover_function(addr);
+    }
 }
 
 static inline void jp_cc_n16(bool condition, CPUState *cpu)
@@ -1012,12 +1031,21 @@ static inline void jp_cc_n16(bool condition, CPUState *cpu)
 
     cpu->PC += 2;
     cpu->cycle_count += 3;
+    if (decompile)
+    {
+        uint16_t addr = memory_read(cpu->memory, cpu->PC - 2) | (memory_read(cpu->memory, cpu->PC - 1) << 8);
+        decompiler_discover_function(addr);
+    }
 }
 
 static inline void jr_e8(int8_t offset, CPUState *cpu)
 {
     cpu->PC += offset;
     cpu->cycle_count += 3;
+    if (decompile)
+    {
+        decompiler_discover_function(cpu->PC);
+    }
 }
 
 static inline void jr_cc_e8(bool condition, int8_t offset, CPUState *cpu)
@@ -1029,6 +1057,11 @@ static inline void jr_cc_e8(bool condition, int8_t offset, CPUState *cpu)
     else
     {
         cpu->cycle_count += 2;
+        if (decompile)
+        {
+            uint16_t target = (uint16_t)(cpu->PC + offset);
+            decompiler_discover_function(target);
+        }
     }
 }
 
